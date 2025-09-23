@@ -38,13 +38,37 @@ async function downloadData() {
   }
 }
 
-// --- NEW SCHEDULER ---
-// This will run the downloadData function every day at 2 AM Central Time.
-cron.schedule('0 8 * * *', () => {
-  downloadData();
-}, {
-  timezone: "UTC"
-});
+async function downloadData() {
+  const fdaUrl = 'https://download.open.fda.gov/drug/ndc/labeler/labeler.txt';
+  const outputPath = path.join(__dirname, 'labeler.txt');
+
+  console.log('🚚 Starting scheduled download of FDA data...');
+  try {
+    const response = await axios({
+      method: 'get',
+      url: fdaUrl,
+      responseType: 'stream',
+      // This header is required to fix the 403 Forbidden error
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+
+    const writer = fs.createWriteStream(outputPath);
+    response.data.pipe(writer);
+
+    return new Promise((resolve, reject) => {
+      writer.on('finish', () => {
+        console.log('✅ FDA data successfully downloaded to labeler.txt');
+        resolve();
+      });
+      writer.on('error', reject);
+    });
+
+  } catch (error) {
+    console.error('❌ Error downloading FDA data:', error.message);
+  }
+}
 
 
 // --- Existing code to serve your website ---
