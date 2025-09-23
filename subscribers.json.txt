@@ -1,10 +1,1 @@
-[
-  {
-    "name": "Kathryn Anglin",
-    "email": "kanglin625@gmail.com"
-  },
-  {
-    "name": "Bobby Anglin",
-    "email": "bobbyanglin@hotmail.com"
-  }
-]
+[]
