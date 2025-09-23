@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrustHealthcare</title>
+  <link rel="stylesheet" 
+        href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.min.css" />
+  <link rel="stylesheet" 
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css?family=Lora:400,700|Roboto+Slab:400,700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/x-icon" href="img/favicon.ico">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <a href="index.html">
+        <img src="img/trusthealthcare-logo.png" alt="TrustHealthcare Logo">
+      </a>
+    </div>
+    <button class="nav-toggle" aria-label="toggle navigation">
+      <span class="hamburger"></span>
+    </button>
+    <nav class="nav">
+      <ul class="nav__list">
+        <li class="nav__item"><a href="#home" class="nav__link">Home</a></li>
+        <li class="nav__item"><a href="#services" class="nav__link">Our Mission</a></li>
+        <li class="nav__item"><a href="#about" class="nav__link">About</a></li>
+        <li class="nav__item"><a href="#work" class="nav__link">Our Work</a></li>
+        <li class="nav__item"><a href="ndc.html" class="nav__link">NDC Database</a></li>
+        <li class="nav__item"><a href="ndc/index.html" class="nav__link">NDC Database</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Intro -->
+  <section class="intro" id="home">
+    <h1 class="section__title section__title--intro">
+      Welcome to <strong>TrustHealthcare</strong>
+    </h1>
+    <p class="section__subtitle section__subtitle--intro">
+      Exposing the hidden mechanics of U.S. healthcare pricing
+    </p>
+    <img src="img/intro-graph.png" alt="TrustHealthcare data visualization" class="intro__img">
+  </section>
+
+  <!-- Our Mission -->
+  <section class="my-services" id="services">
+    <h2 class="section__title section__title--services">What We Do</h2>
+    <div class="services">
+      <div class="service">
+        <h3>Uncover Hidden Pricing</h3>
+        <p>We investigate vertically integrated healthcare giants such as 
+          <strong>Cigna</strong> and <strong>Express Scripts</strong>, along with their 
+          affiliates like <strong>Quallent</strong>, <strong>InsideRx</strong>, and 
+          <strong>Evernorth</strong>, to expose how drug prices are manipulated through 
+          shell companies and opaque contracts.</p>
+      </div>
+      <div class="service">
+        <h3>Analyze FDA Labeler Data</h3>
+        <p>We map live <strong>FDA NDC labeler data</strong> to their corporate parents,
+          identifying white-labeled manufacturers and subsidiaries concealed from public view.</p>
+      </div>
+      <div class="service">
+        <h3>Build Transparency Tools</h3>
+        <p>We are developing public dashboards and subscription tools that allow employers,
+          journalists, and regulators to trace pharmaceutical pricing flows with precision
+          and clarity.</p>
+      </div>
+    </div>
+    <a href="#work" class="btn">See Our Work</a>
+  </section>
+
+  <!-- About -->
+  <section class="about-me" id="about">
+    <h2 class="section__title section__title--about">Who We Are</h2>
+    <p class="section__subtitle section__subtitle--about">
+      Investigators & Analysts
+    </p>
+    <img src="img/about-ownership.png" alt="Ownership network diagram" class="about-me__img">
+    <div class="about-me__body">
+      <p>
+        TrustHealthcare is a mission-driven investigative platform exposing the
+        opaque pricing structures of the U.S. pharmaceutical supply chain. Our
+        work focuses on mapping corporate ownership, revealing conflicts of interest,
+        and tracing how revenue is extracted by PBMs, group purchasing organizations,
+        and their white-labeled manufacturers.  
+      </p>
+      <p>
+        By connecting public data sources like FDA NDC labeler files, SEC filings,
+        and state registries, we aim to bring transparency to the hidden mechanics
+        of drug pricing—and empower stakeholders to challenge them.
+      </p>
+    </div>
+  </section>
+
+  <!-- Our Work -->
+  <section class="my-work" id="work">
+    <h2 class="section__title section__title--work">Our Work</h2>
+    <p class="section__subtitle section__subtitle--work">
+      A look at what we're building
+    </p>
+    <div class="portfolio">
+      <!-- Portfolio item 1 -->
+      <a href="ndc.html" class="portfolio__item">
+        <img src="img/ndc-screenshot.jpg" alt="NDC Labeler Database preview" class="portfolio__img">
+      </a>
+      <!-- Portfolio item 2 -->
+      <a href="cleanchain.html" class="portfolio__item">
+        <img src="img/cleanchain-preview.jpg" alt="CleanChain dashboard preview" class="portfolio__img">
+      </a>
+      <!-- Portfolio item 3 -->
+      <a href="investigations.html" class="portfolio__item">
+        <img src="img/investigation-map.jpg" alt="Ownership investigation preview" class="portfolio__img">
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <a href="mailto:info@trusthealthcare.org" class="footer__link">
+      info@trusthealthcare.org
+    </a>
+    <ul class="social-list">
+      <li class="social-list__item">
+        <a class="social-list__link" href="https://www.linkedin.com/">
+          <i class="fa-brands fa-linkedin"></i>
+        </a>
+      </li>
+      <li class="social-list__item">
+        <a class="social-list__link" href="https://github.com/">
+          <i class="fa-brands fa-github"></i>
+        </a>
+      </li>
+      <li class="social-list__item">
+        <a class="social-list__link" href="https://twitter.com/">
+          <i class="fa-brands fa-x-twitter"></i>
+        </a>
+      </li>
+    </ul>
+  </footer>
+
+  <script src="js/index.js"></script>
+</body>
+</html>
