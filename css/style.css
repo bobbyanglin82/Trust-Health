@@ -368,3 +368,54 @@ header {
 .social-list__link:hover {
   opacity: .6;
 }
+/* ===========================
+   NDC Scanner Page
+   =========================== */
+.scanner-section .section__subtitle {
+    background: none;
+    color: var(--clr-muted);
+    padding: 0;
+    margin-bottom: 2em;
+    font-family: var(--ff-primary);
+}
+
+.search-input {
+    margin-bottom: 1.5em;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.scanner-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 1em;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.scanner-table th,
+.scanner-table td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+    font-size: 0.9em;
+}
+
+.scanner-table th {
+    background-color: var(--clr-dark);
+    color: var(--clr-light);
+    font-family: var(--ff-secondary);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.scanner-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.scanner-table tr:hover {
+    background-color: #f1f1f1;
+}
