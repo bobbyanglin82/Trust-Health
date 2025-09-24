@@ -4,7 +4,7 @@ let allData = [];
 
 async function fetchData() {
   try {
-    tbody.innerHTML = `<tr><td colspan="4">Loading latest data from server...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Loading latest data from server...</td></tr>`;
     const response = await fetch('/data');
     if (!response.ok) throw new Error('Network response was not ok');
     
@@ -13,7 +13,7 @@ async function fetchData() {
 
   } catch (error) {
     console.error("Failed to fetch data:", error);
-    tbody.innerHTML = `<tr><td colspan="4">Error: Could not load data.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Error: Could not load data.</td></tr>`;
   }
 }
 
@@ -22,10 +22,9 @@ if (searchBox) {
     const query = searchBox.value.toLowerCase();
     if (!allData) return;
     const searchResults = allData.filter(item => {
-      const openfda = item.openfda || {};
-      const brandName = (item.brand_name || openfda.brand_name || []).join(' ').toLowerCase();
-      const genericName = (item.generic_name || openfda.generic_name || []).join(' ').toLowerCase();
-      const manufacturer = (openfda.manufacturer_name || []).join(' ').toLowerCase();
+      const brandName = (item.proprietary_name || '').toLowerCase();
+      const genericName = (item.nonproprietary_name || '').toLowerCase();
+      const manufacturer = (item.labeler_name || '').toLowerCase();
       
       return brandName.includes(query) || genericName.includes(query) || manufacturer.includes(query);
     });
@@ -36,12 +35,10 @@ if (searchBox) {
 function renderTable(data) {
   tbody.innerHTML = '';
   if (!data || data.length === 0) {
-    // Update colspan to match the new number of columns
     tbody.innerHTML = `<tr><td colspan="6">No results found.</td></tr>`;
     return;
   }
 
-  // Helper function to format YYYYMMDD date strings
   const formatDate = (dateStr) => {
     if (!dateStr || dateStr.length !== 8) return 'N/A';
     const year = dateStr.substring(0, 4);
@@ -53,17 +50,15 @@ function renderTable(data) {
   data.forEach(item => {
     const row = document.createElement('tr');
     
-    // Extract data using the validated field names
-    const openfda = item.openfda || {};
-    const productNdc = (openfda.product_ndc || ['N/A'])[0];
-    const suffix = item.proprietary_name_suffix || 'N/A';
-    const nonProprietaryName = (item.nonproprietary_name || ['N/A']).join(', ');
+    // Extract data from the root of the item object
+    const productNdc = item.product_ndc || 'N/A';
+    const proprietaryName = item.proprietary_name || 'N/A';
+    const nonProprietaryName = item.nonproprietary_name || 'N/A';
     const startDate = formatDate(item.start_marketing_date);
     const endDate = formatDate(item.end_marketing_date);
     const labeler = item.labeler_name || 'N/A';
 
-    // Create cells in the correct order
-    [productNdc, suffix, nonProprietaryName, startDate, endDate, labeler].forEach(text => {
+    [productNdc, proprietaryName, nonProprietaryName, startDate, endDate, labeler].forEach(text => {
       const cell = document.createElement('td');
       cell.textContent = text;
       row.appendChild(cell);
