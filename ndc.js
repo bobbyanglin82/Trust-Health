@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok) throw new Error('Network response was not ok');
       
       allData = await response.json();
+     
+      console.log("Data received from server:", allData);
+     
       renderTable(allData);
 
     } catch (error) {
