@@ -1,103 +1,62 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const axios = require('axios'); // <-- ADDED
-const cron = require('node-cron'); // <-- ADDED
+const axios = require('axios');
+const cron = require('node-cron');
 
 const app = express();
 
+const knownEntities = [
+  "QUALLENT", "CORDAVIS", "OPTUM HEALTH SOLUTIONS", "ASCENT PHARMACEUTICALS",
+  "ZINC HEALTH VENTURES", "ZINC HEALTH SERVICES", "EMISAR PHARMA SERVICES"
+];
+
+// This function now queries the official openFDA API
 async function downloadData() {
-  const fdaUrl = 'https://download.open.fda.gov/drug/ndc/labeler/labeler.txt';
-  const outputPath = path.join(__dirname, 'labeler.txt');
+  console.log('🔍 Querying the openFDA API for new data...');
+  
+  // Create the search query string from your entities list
+  const searchQuery = knownEntities.map(entity => `openfda.manufacturer_name:"${entity}"`).join('+OR+');
+  // We'll query for the last 100 updated records matching your entities.
+  const apiUrl = `https://api.fda.gov/drug/label.json?search=${searchQuery}&sort=effective_time:desc&limit=100`;
+  const outputPath = path.join(__dirname, 'data.json');
 
-  console.log('🚚 Starting scheduled download of FDA data...');
   try {
-    const response = await axios({
-      method: 'get',
-      url: fdaUrl,
-      responseType: 'stream',
-      // This header makes the request look like a normal web browser
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
+    const response = await axios.get(apiUrl);
+    const data = response.data;
 
-    const writer = fs.createWriteStream(outputPath);
-    response.data.pipe(writer);
-
-    return new Promise((resolve, reject) => {
-      writer.on('finish', () => {
-        console.log('✅ FDA data successfully downloaded to labeler.txt');
-        resolve();
-      });
-      writer.on('error', reject);
-    });
+    // Save the clean JSON results to a file
+    fs.writeFileSync(outputPath, JSON.stringify(data.results, null, 2));
+    console.log(`✅ Successfully fetched and saved ${data.results.length} records.`);
 
   } catch (error) {
-    console.error('❌ Error downloading FDA data:', error.message);
-  }
-}
-
-async function downloadData() {
-  const fdaUrl = 'https://download.open.fda.gov/drug/ndc/labeler/labeler.txt';
-  const outputPath = path.join(__dirname, 'labeler.txt');
-
-  console.log('🚚 Starting scheduled download of FDA data...');
-  try {
-    const response = await axios({
-      method: 'get',
-      url: fdaUrl,
-      responseType: 'stream',
-      // This header is required to fix the 403 Forbidden error
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-
-    const writer = fs.createWriteStream(outputPath);
-    response.data.pipe(writer);
-
-    return new Promise((resolve, reject) => {
-      writer.on('finish', () => {
-        console.log('✅ FDA data successfully downloaded to labeler.txt');
-        resolve();
-      });
-      writer.on('error', reject);
-    });
-
-  } catch (error) {
-    console.error('❌ Error downloading FDA data:', error.message);
-  }
-}
-
-
-// --- Existing code to serve your website ---
-app.use(express.static(path.join(__dirname)));
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/ndc.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'ndc.html'));
-});
-
-app.get("/data", (req, res) => {
-  const dataPath = path.join(__dirname, 'labeler.txt');
-  fs.readFile(dataPath, 'utf8', (err, data) => {
-    if (err) {
-      console.error("Error reading the data file:", err);
-      return res.status(500).send("Data file not found or is currently being downloaded.");
+    if (error.response && error.response.status === 404) {
+      console.log('✅ No records found for the specified entities. This is normal.');
+      // Create an empty file so the frontend doesn't break
+      fs.writeFileSync(outputPath, '[]');
+    } else {
+      console.error('❌ Error fetching data from openFDA API:', error.message);
     }
-    res.type('text/plain').send(data);
-  });
+  }
+}
+
+// Scheduler remains the same
+cron.schedule('0 8 * * *', () => downloadData(), { timezone: "UTC" });
+
+// --- Server Routes ---
+app.use(express.static(path.join(__dirname)));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/ndc.html', (req, res) => res.sendFile(path.join(__dirname, 'ndc.html')));
+
+// This endpoint now serves clean JSON
+app.get("/data", (req, res) => {
+  const dataPath = path.join(__dirname, 'data.json');
+  res.sendFile(dataPath);
 });
 
-// --- Code to start the server ---
-const PORT = process.env.PORT || 3001; 
+// --- Server Start ---
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
-  // Run the download once immediately on startup
-  console.log('Running initial data download on server start...');
-  downloadData();
+  downloadData(); // Run once on startup
 });

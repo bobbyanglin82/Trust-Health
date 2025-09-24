@@ -1,89 +1,60 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // --- REMOVED THE fileInput VARIABLE ---
   const searchBox = document.getElementById('searchBox');
   const tbody = document.querySelector('#resultsTable tbody');
+  let allData = []; // Store the master list of data
 
-  const knownEntities = [
-    "QUALLENT", "CORDAVIS", "OPTUM HEALTH SOLUTIONS", "ASCENT PHARMACEUTICALS",
-    "ZINC HEALTH VENTURES", "ZINC HEALTH SERVICES", "EMISAR PHARMA SERVICES"
-  ];
-
-  // --- NEW FUNCTION TO FETCH DATA FROM THE SERVER ---
   async function fetchData() {
     try {
-      tbody.innerHTML = `<tr><td colspan="6">Loading latest data from server...</td></tr>`;
-      // This is the new part that gets the data from your server
+      tbody.innerHTML = `<tr><td colspan="4">Loading latest data from server...</td></tr>`;
       const response = await fetch('/data');
-      if (!response.ok) {
-        throw new Error(`Server returned an error: ${response.statusText}`);
-      }
-      const text = await response.text();
-      processData(text);
+      if (!response.ok) throw new Error('Network response was not ok');
+      
+      // Data is now JSON, not text
+      allData = await response.json();
+      renderTable(allData);
+
     } catch (error) {
       console.error("Failed to fetch data:", error);
-      tbody.innerHTML = `<tr><td colspan="6">Error: Could not load data from the server.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4">Error: Could not load data.</td></tr>`;
     }
   }
 
-  // --- REMOVED THE fileInput.addEventListener BLOCK ---
-
-  function processData(text) {
-    const rows = text.trim().split(/\r?\n/).filter(line => line.length > 0);
-    // NOTE: The labeler.txt file does not have a header, so we process all rows.
-    // const dataRows = rows.slice(1); <-- This line is no longer needed for labeler.txt
-
-    const data = rows.map(line => {
-        const fields = line.split('\t');
-        return fields.map(field => field.trim().replace(/^"|"$/g, ''));
+  // Search function now filters the local JSON data
+  searchBox.addEventListener('input', () => {
+    const query = searchBox.value.toLowerCase();
+    const searchResults = allData.filter(item => {
+      const brandName = (item.openfda.brand_name || []).join(', ').toLowerCase();
+      const manufacturer = (item.openfda.manufacturer_name || []).join(', ').toLowerCase();
+      return brandName.includes(query) || manufacturer.includes(query);
     });
+    renderTable(searchResults);
+  });
 
-    // The data structure for labeler.txt is simpler. We check index 1 for the name.
-    const filteredData = data.filter(fields => {
-      if (fields.length < 2) return false; 
-      const nameFromDb = fields[1].toUpperCase().trim(); 
-
-      if (!nameFromDb) return false;
-      return knownEntities.some(entity => nameFromDb.toUpperCase().includes(entity));
-    });
-
-    renderTable(filteredData);
-
-    searchBox.addEventListener('input', () => {
-      const query = searchBox.value.toLowerCase();
-      const searchResults = filteredData.filter(fields => {
-        if (fields.length < 2) return false;
-        const name = fields[1].toLowerCase();
-        return name.includes(query);
-      });
-      renderTable(searchResults);
-    });
-  }
-
-  function renderTable(rows) {
+  function renderTable(data) {
     tbody.innerHTML = '';
-    if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="2">No results found for the specified entities.</td></tr>`;
-        return;
+    if (!data || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4">No results found.</td></tr>`;
+      return;
     }
-    
-    // labeler.txt has no date to sort by, so we sort alphabetically by name (index 1)
-    const sortedRows = rows.sort((a, b) => a[1].localeCompare(b[1]));
 
-    sortedRows.forEach(fields => {
-        const row = document.createElement('tr');
+    data.forEach(item => {
+      const row = document.createElement('tr');
       
-        // The columns for labeler.txt are just the Labeler Code (0) and Labeler Name (1)
-        const columnsToShow = [0, 1]; 
-      
-        columnsToShow.forEach(index => {
-            const cell = document.createElement('td');
-            cell.textContent = fields[index] || '';
-            row.appendChild(cell);
-        });
-        tbody.appendChild(row);
+      // Accessing properties from the JSON object
+      const manufacturer = (item.openfda.manufacturer_name || ['N/A']).join(', ');
+      const brandName = (item.openfda.brand_name || ['N/A']).join(', ');
+      const genericName = (item.openfda.generic_name || ['N/A']).join(', ');
+      const productNdc = (item.openfda.product_ndc || ['N/A']).join(', ');
+
+      // Create cells in order: Manufacturer, Brand Name, Generic Name, NDC
+      [manufacturer, brandName, genericName, productNdc].forEach(text => {
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        row.appendChild(cell);
+      });
+      tbody.appendChild(row);
     });
   }
 
-  // --- This now starts the process when the page loads ---
   fetchData();
 });
