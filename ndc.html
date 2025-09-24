@@ -9,34 +9,6 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css?family=Lora:400,700|Roboto+Slab:400,700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    
-    <style>
-        .scanner-section {
-            padding: 2em;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 1em;
-        }
-        th, td {
-            border: 1px solid #ccc;
-            padding: 8px;
-            text-align: left;
-            font-size: 0.9em;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        input {
-            margin-bottom: 1em;
-            padding: 8px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-    </style>
 </head>
 <body>
     <header>
@@ -61,19 +33,19 @@
 
     <section class="scanner-section">
         <h1 class="section__title">NDC Labeler Database Scanner</h1>
-        <p class="subtitle">A tool to filter the FDA's NDC Directory</p>
+        <p class="section__subtitle">A tool to filter the FDA's NDC Directory</p>
                 
         <h2>Filtered Results</h2>
-        <input type="text" id="searchBox" placeholder="Search filtered results by name...">
+        <input type="text" id="searchBox" class="search-input" placeholder="Search filtered results by name or labeler...">
         
-        <table id="resultsTable">
+        <table id="resultsTable" class="scanner-table">
             <thead>
                 <tr>
                     <th>Product NDC</th>
                     <th>Proprietary Name</th>
                     <th>Non-Proprietary Name</th>
-                    <th>Start Marketing Date</th>
-                    <th>End Marketing Date</th>
+                    <th>Marketing Category</th>
+                    <th>Dosage Form</th>
                     <th>Labeler Name</th>
                 </tr>
             </thead>
