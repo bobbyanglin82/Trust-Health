@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/data');
       if (!response.ok) throw new Error('Network response was not ok');
       
-      // Data is now JSON, not text
       allData = await response.json();
       renderTable(allData);
 
@@ -22,10 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Search function now filters the local JSON data
   searchBox.addEventListener('input', () => {
     const query = searchBox.value.toLowerCase();
+    if (!allData) return; // Add a safety check for the data
     const searchResults = allData.filter(item => {
-      const brandName = (item.openfda.brand_name || []).join(', ').toLowerCase();
-      const manufacturer = (item.openfda.manufacturer_name || []).join(', ').toLowerCase();
-      return brandName.includes(query) || manufacturer.includes(query);
+      // Create a searchable text string from all relevant fields
+      const openfda = item.openfda || {};
+      const brandName = (item.brand_name || openfda.brand_name || []).join(' ').toLowerCase();
+      const genericName = (item.generic_name || openfda.generic_name || []).join(' ').toLowerCase();
+      const manufacturer = (openfda.manufacturer_name || []).join(' ').toLowerCase();
+      
+      return brandName.includes(query) || genericName.includes(query) || manufacturer.includes(query);
     });
     renderTable(searchResults);
   });
@@ -40,11 +44,16 @@ document.addEventListener('DOMContentLoaded', () => {
     data.forEach(item => {
       const row = document.createElement('tr');
       
-      // Accessing properties from the JSON object
-      const manufacturer = (item.openfda.manufacturer_name || ['N/A']).join(', ');
-      const brandName = (item.openfda.brand_name || ['N/A']).join(', ');
-      const genericName = (item.openfda.generic_name || ['N/A']).join(', ');
-      const productNdc = (item.openfda.product_ndc || ['N/A']).join(', ');
+      // --- THIS IS THE CORRECTED LOGIC ---
+      // Safely get the openfda object, or an empty one if it doesn't exist
+      const openfda = item.openfda || {};
+
+      // Prioritize the top-level name, fall back to the openfda name, then to 'N/A'
+      const manufacturer = (openfda.manufacturer_name || ['N/A'])[0];
+      const brandName = (item.brand_name || openfda.brand_name || ['N/A'])[0];
+      const genericName = (item.generic_name || openfda.generic_name || ['N/A'])[0];
+      const productNdc = (openfda.product_ndc || ['N/A'])[0];
+      // --- END OF CORRECTED LOGIC ---
 
       // Create cells in order: Manufacturer, Brand Name, Generic Name, NDC
       [manufacturer, brandName, genericName, productNdc].forEach(text => {
