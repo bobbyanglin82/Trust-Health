@@ -20,21 +20,35 @@ async function fetchData() {
 function renderTable(data) {
   tbody.innerHTML = '';
   if (!data || data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6">No results found for the specified labelers.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">No results found for the specified labelers.</td></tr>`;
     return;
   }
+
+  // Helper function to format date from YYYYMMDD to YYYY-MM-DD
+  const formatDate = (dateStr) => {
+    if (dateStr && dateStr.length === 8) {
+      return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+    }
+    return dateStr || 'N/A';
+  };
 
   data.forEach(item => {
     const row = document.createElement('tr');
     
-    const productNdc = item.product_ndc || 'N/A';
-    const proprietaryName = item.proprietary_name || 'N/A';
-    const nonProprietaryName = item.nonproprietary_name || 'N/A';
-    const marketingCategory = item.marketing_category || 'N/A';
-    const dosageForm = item.dosage_form || 'N/A';
-    const labeler = item.labeler_name || 'N/A';
+    // Define the data for each cell in the correct order
+    const cells = [
+      item.product_ndc || 'N/A',
+      item.labeler_name || 'N/A',
+      item.proprietary_name || 'N/A',
+      item.nonproprietary_name || 'N/A',
+      formatDate(item.start_marketing_date),
+      formatDate(item.end_marketing_date),
+      'N/A (SPL Data)', // Placeholder for Manufactured By
+      'N/A (SPL Data)'  // Placeholder for Manufactured For
+    ];
 
-    [productNdc, proprietaryName, nonProprietaryName, marketingCategory, dosageForm, labeler].forEach(text => {
+    // Create a <td> for each cell and append it to the row
+    cells.forEach(text => {
       const cell = document.createElement('td');
       cell.textContent = text;
       row.appendChild(cell);
