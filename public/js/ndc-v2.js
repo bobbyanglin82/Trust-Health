@@ -9,6 +9,13 @@ async function fetchData() {
     if (!response.ok) throw new Error('Network response was not ok');
     
     allData = await response.json();
+    allData.sort((a, b) => {
+      // Ensure dates exist before comparing
+      const dateA = a.marketing_start_date || '0';
+      const dateB = b.marketing_start_date || '0';
+      return dateB.localeCompare(dateA);
+    });
+    
     renderTable(allData);
 
   } catch (error) {

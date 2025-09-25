@@ -19,7 +19,7 @@ async function downloadData() {
   const searchQuery = knownEntities.map(entity => `labeler_name:"${entity}"`).join('+OR+');
   
   // The API endpoint is now drug/ndc.json
-  const apiUrl = `https://api.fda.gov/drug/ndc.json?search=${searchQuery}&limit=100`;
+  const apiUrl = `https://api.fda.gov/drug/ndc.json?search=${searchQuery}&limit=1000`;
   const outputPath = path.join(__dirname, 'data.json');
 
   try {
