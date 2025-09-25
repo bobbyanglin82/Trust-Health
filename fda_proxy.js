@@ -7,7 +7,7 @@ const cron = require('node-cron');
 const app = express();
 
 const knownEntities = [
-  "QUALLENT", "CORDAVIS", "OPTUM HEALTH SOLUTIONS", "ASCENT PHARMACEUTICALS",
+  "QUALLENT", "CORDAVIS", "OPTUM HEALTH SOLUTIONS", 
   "ZINC HEALTH VENTURES", "ZINC HEALTH SERVICES", "EMISAR PHARMA SERVICES"
 ];
 

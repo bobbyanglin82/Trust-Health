@@ -35,16 +35,16 @@ function renderTable(data) {
   data.forEach(item => {
     const row = document.createElement('tr');
     
-    // Define the data for each cell in the correct order
+    // Define the data for each cell using the CORRECT API field names
     const cells = [
       item.product_ndc || 'N/A',
       item.labeler_name || 'N/A',
-      item.proprietary_name || 'N/A',
-      item.nonproprietary_name || 'N/A',
-      formatDate(item.start_marketing_date),
-      formatDate(item.end_marketing_date),
-      'N/A (SPL Data)', // Placeholder for Manufactured By
-      'N/A (SPL Data)'  // Placeholder for Manufactured For
+      item.brand_name || 'N/A',         // CORRECTED: Was proprietary_name
+      item.generic_name || 'N/A',       // CORRECTED: Was nonproprietary_name
+      formatDate(item.marketing_start_date), // CORRECTED: Was start_marketing_date
+      formatDate(item.marketing_end_date),   // CORRECTED: Was end_marketing_date
+      'N/A (SPL Data)', 
+      'N/A (SPL Data)'
     ];
 
     // Create a <td> for each cell and append it to the row
