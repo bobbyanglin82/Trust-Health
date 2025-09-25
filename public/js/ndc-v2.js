@@ -70,11 +70,17 @@ if (searchBox) {
     if (!allData) return;
     
     const searchResults = allData.filter(item => {
-      const brandName = (item.proprietary_name || '').toLowerCase();
-      const genericName = (item.nonproprietary_name || '').toLowerCase();
-      const manufacturer = (item.labeler_name || '').toLowerCase();
+      // Get all the values we want to search against
+      const brandName = (item.brand_name || '').toLowerCase();
+      const genericName = (item.generic_name || '').toLowerCase();
+      const labeler = (item.labeler_name || '').toLowerCase();
+      const productNdc = (item.product_ndc || '').toLowerCase(); // Add the Product NDC to the search criteria
       
-      return brandName.includes(query) || genericName.includes(query) || manufacturer.includes(query);
+      // Return true if the query is found in ANY of the fields
+      return brandName.includes(query) || 
+             genericName.includes(query) || 
+             labeler.includes(query) ||
+             productNdc.includes(query);
     });
     renderTable(searchResults);
   });
