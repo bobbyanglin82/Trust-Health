@@ -4,7 +4,7 @@ let allData = [];
 
 async function fetchData() {
   try {
-    tbody.innerHTML = `<tr><td colspan="6">Loading latest data from server...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">Loading latest data from server...</td></tr>`;
     const response = await fetch('/data');
     if (!response.ok) throw new Error('Network response was not ok');
     
@@ -20,7 +20,7 @@ async function fetchData() {
 
   } catch (error) {
     console.error("Failed to fetch data:", error);
-    tbody.innerHTML = `<tr><td colspan="6">Error: Could not load data.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">Error: Could not load data.</td></tr>`;
   }
 }
 
@@ -42,16 +42,16 @@ function renderTable(data) {
   data.forEach(item => {
     const row = document.createElement('tr');
     
-    // Define the data for each cell using the CORRECT API field names
+    // Define the data for each cell using the API field names
     const cells = [
       item.product_ndc || 'N/A',
       item.labeler_name || 'N/A',
-      item.brand_name || 'N/A',         // CORRECTED: Was proprietary_name
-      item.generic_name || 'N/A',       // CORRECTED: Was nonproprietary_name
-      formatDate(item.marketing_start_date), // CORRECTED: Was start_marketing_date
-      formatDate(item.marketing_end_date),   // CORRECTED: Was end_marketing_date
-      'N/A (SPL Data)', 
-      'N/A (SPL Data)'
+      item.brand_name || 'N/A',
+      item.generic_name || 'N/A',
+      formatDate(item.marketing_start_date),
+      formatDate(item.marketing_end_date),
+      item.manufacturer_name || 'N/A',  // CORRECTED: Reads dynamically
+      item.manufactured_for || 'N/A'    // CORRECTED: Reads dynamically
     ];
 
     // Create a <td> for each cell and append it to the row
@@ -74,7 +74,7 @@ if (searchBox) {
       const brandName = (item.brand_name || '').toLowerCase();
       const genericName = (item.generic_name || '').toLowerCase();
       const labeler = (item.labeler_name || '').toLowerCase();
-      const productNdc = (item.product_ndc || '').toLowerCase(); // Add the Product NDC to the search criteria
+      const productNdc = (item.product_ndc || '').toLowerCase();
       
       // Return true if the query is found in ANY of the fields
       return brandName.includes(query) || 
