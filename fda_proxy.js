@@ -52,30 +52,30 @@ async function downloadData() {
       }
       
       if (!labelApiUrl) {
-        product.manufacturer_name = product.labeler_name || 'N/A (No Link)';
-        product.manufactured_for = product.labeler_name || 'N/A (No Link)';
+        product.manufacturer_name = 'N/A (No Link)';
+        product.manufactured_for = product.labeler_name; // Fallback for "mfd for"
         return product;
       }
       
       try {
-        const labelResponse = await axios.get(apiUrl); // I changed this line
+        // THIS LINE IS NOW CORRECTED
+        const labelResponse = await axios.get(labelApiUrl);
+
         if (labelResponse.data.results && labelResponse.data.results.length > 0) {
             const resultData = labelResponse.data.results[0]?.openfda;
             
             const manufacturer = resultData?.manufacturer_name?.[0];
-            // FINAL WORKAROUND: If labeler is missing from the SPL data,
-            // fall back to the labeler from the initial NDC query.
             const labeler = resultData?.labeler_name?.[0] || product.labeler_name;
 
             product.manufacturer_name = manufacturer || 'N/A (Not Found)';
             product.manufactured_for = labeler || 'N/A (Not Found)';
         } else {
             product.manufacturer_name = 'N/A (No SPL Match)';
-            product.manufactured_for = product.labeler_name;
+            product.manufactured_for = product.labeler_name; // Fallback for "mfd for"
         }
       } catch (e) {
         product.manufacturer_name = 'N/A (API Error)';
-        product.manufactured_for = product.labeler_name;
+        product.manufactured_for = product.labeler_name; // Fallback for "mfd for"
       }
       return product;
     });
@@ -94,23 +94,9 @@ async function downloadData() {
   }
 }
 
-
+// --- Server Routes & Startup (No changes needed below this line) ---
 cron.schedule('0 8 * * *', () => downloadData(), { timezone: "UTC" });
 
-// --- Server Routes ---
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/ndc.html', (req, res) => res.sendFile(path.join(__dirname, 'ndc.html')));
-
-app.get("/data", (req, res) => {
-  const dataPath = path.join(__dirname, 'data.json');
-  res.sendFile(dataPath);
-});
-// ... keep all the code above this line the same ...
-
-cron.schedule('0 8 * * *', () => downloadData(), { timezone: "UTC" });
-
-// --- Server Routes ---
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/ndc.html', (req, res) => res.sendFile(path.join(__dirname, 'ndc.html')));
@@ -120,17 +106,6 @@ app.get("/data", (req, res) => {
   res.sendFile(dataPath);
 });
 
-
-// --- DIAGNOSTIC ROUTE TO CHECK SCRIPT VERSION ---
-const SCRIPT_VERSION = "V5_FINAL_DEPLOY_TEST"; 
-app.get("/verify-version", (req, res) => {
-  res.setHeader('Content-Type', 'text/plain');
-  res.send(`The script running on the server is version: ${SCRIPT_VERSION}`);
-});
-// --------------------------------------------------
-
-
-// --- CORRECTED Server Start Logic for Render ---
 const PORT = process.env.PORT || 3001;
 
 async function startServer() {
