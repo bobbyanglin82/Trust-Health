@@ -8,77 +8,15 @@ const app = express();
 
 // A comprehensive list of all known text-bearing sections in the drug/label API
 const TEXT_BEARING_SECTIONS = [
-    'abuse_and_overdosage_text',
-    'accessories_text',
-    'active_ingredient_text',
-    'adverse_reactions_text',
-    'alarms_text',
-    'animal_pharmacology_and_or_toxicology_text',
-    'assembly_or_installation_instructions_text',
-    'boxed_warning_text',
-    'calibration_instructions_text',
-    'cleaning_and_sterilization_text',
-    'clinical_pharmacology_text',
-    'clinical_studies_text',
-    'compatible_accessories_text',
-    'complaint_file_text',
-    'contraindications_text',
-    'controlled_substance_text',
-    'dependence_text',
-    'description_text',
-    'disposal_and_waste_handling_text',
-    'dosage_and_administration_text',
-    'drug_abuse_and_dependence_text',
-    'drug_and_or_laboratory_test_interactions_text',
-    'drug_interactions_text',
-    'environmental_warning_text',
-    'geriatric_use_text',
-    'guaranteed_analysis_of_feed_text',
-    'health_claim_text',
-    'how_supplied_section_text',
-    'inactive_ingredient_text',
-    'indications_and_usage_text',
-    'information_for_owners_or_caregivers_text',
-    'information_for_patients_text',
-    'instructions_for_use_text',
-    'intended_use_of_the_device_text',
-    'laboratory_tests_text',
-    'labor_and_delivery_text',
-    'mechanism_of_action_text',
-    'microbiology_text',
-    'nonclinical_toxicology_text',
-    'nursing_mothers_text',
-    'other_safety_information_text',
-    'overdosage_text',
-    'package_label_principal_display_panel_text',
-    'pediatric_use_text',
-    'pharmacodynamics_text',
-    'pharmacogenomics_text',
-    'pharmacokinetics_text',
-    'precautions_text',
-    'pregnancy_text',
-    'principal_display_panel_text',
-    'purpose_text',
-    'questions_text',
-    'recent_major_changes_text',
-    'references_text',
-    'risks_text',
-    'safe_handling_warning_text',
-    'spl_medguide_text',
-    'spl_patient_package_insert_text',
-    'spl_product_data_elements_text',
-    'spl_unclassified_section_text',
-    'statement_of_identity_text',
-    'storage_and_handling_text',
-    'summary_of_safety_and_effectiveness_text',
-    'teratogenic_effects_text',
-    'troubleshooting_text',
-    'use_in_specific_populations_text',
-    'user_safety_warnings_text',
-    'warnings_and_cautions_text',
-    'warnings_text',
-    'when_using_text'
+  'principal_display_panel',
+  'package_label_principal_display_panel',
+  'how_supplied',
+  'how_supplied_table',
+  'description',
+  'spl_unclassified_section',
+  'title' // sometimes has “Marketed by …”
 ];
+
 
 const knownEntities = [
   "QUALLENT", "CORDAVIS", "OPTUM HEALTH SOLUTIONS", 
@@ -99,21 +37,19 @@ function parseManufacturingInfo(fullText) {
     };
     let longestSnippet = '';
     const textLines = fullText.split('\n');
-    textLines.forEach(line => {
-        for (const key in patterns) {
-            const match = line.match(patterns[key]);
-            if (match && match[1]) {
-                const capturedText = match[1].trim();
-                if (!info[key]) info[key] = capturedText;
-                if (line.trim().length > longestSnippet.length) {
-                    longestSnippet = line.trim();
-                }
-            }
+    textLines.forEach((line, i) => {
+      for (const [key, rx] of Object.entries(patterns)) {
+        const m = line.match(rx);
+        if (m && !info[key]) {
+          const captured = captureWithFollowing(textLines, i, m[1].trim());
+          info[key] = captured.replace(/\s+/g, ' ').trim();
+          if (captured.length > (info.raw_snippet?.length || 0)) info.raw_snippet = line.trim();
         }
+      }
     });
     info.raw_snippet = longestSnippet || null;
     if (!info.manufactured_for && info.distributed_by) {
-        info.manufactured_for = info.distributed_by;
+      info.manufactured_for = info.distributed_by;
     }
     return info;
 }
@@ -122,42 +58,155 @@ async function fetchAndParseLabelFromAPI(splSetId) {
   if (!splSetId) {
     return { final_manufacturer: null, final_manufactured_for: null, raw_snippet: null };
   }
-  
-  const labelApiUrl = `https://api.fda.gov/drug/label.json?search=spl_set_id:"${splSetId}"&limit=1`;
-  
+
+  // Ask openFDA for the newest effective label and only the fields we care about
+  const fields = [
+    'id', 'set_id', 'effective_time',
+    'openfda.product_ndc', 'openfda.package_ndc',
+    'title',
+    'principal_display_panel', 'package_label_principal_display_panel',
+    'how_supplied', 'how_supplied_table',
+    'description', 'spl_unclassified_section'
+  ].join(',');
+
+  const labelApiUrl =
+    `https://api.fda.gov/drug/label.json?search=spl_set_id:"${splSetId}"&order=effective_time:desc&limit=1`;
+
   try {
     const response = await axios.get(labelApiUrl);
-    const labelData = response.data.results?.[0];
+    const labelData = response?.data?.results?.[0];
 
     if (!labelData) {
-      return { final_manufacturer: 'N/A (Label Not Found in API)', final_manufactured_for: null, raw_snippet: null };
+      return {
+        final_manufacturer: 'N/A (Label Not Found in API)',
+        final_manufactured_for: null,
+        raw_snippet: null
+      };
     }
-    
-    let textCorpus = '';
-    TEXT_BEARING_SECTIONS.forEach(section => {
-      const value = labelData[section];
-      
-      // --- CRITICAL FIX ---
-      // This new logic correctly handles cases where the API returns a single string
-      // INSTEAD of an array of strings.
-      if (Array.isArray(value)) {
-        textCorpus += value.join('\n') + '\n\n';
-      } else if (typeof value === 'string') {
-        textCorpus += value + '\n\n';
-      }
-      // --- END FIX ---
-    });
 
-    const manufacturingInfo = parseManufacturingInfo(textCorpus);
+    // Preferred openFDA text-bearing sections
+    const TEXT_BEARING_SECTIONS = [
+      'principal_display_panel',
+      'package_label_principal_display_panel',
+      'how_supplied',
+      'how_supplied_table',
+      'description',
+      'spl_unclassified_section',
+      'title'
+    ];
+
+    // Build a robust text corpus (dedup, flatten, include odd sponsor mappings)
+    const textCorpus = (() => {
+      const seen = new Set();
+      const chunks = [];
+
+      const pushChunk = (val) => {
+        if (!val) return;
+        if (Array.isArray(val)) {
+          val.flat(Infinity).forEach(pushChunk);
+          return;
+        }
+        if (typeof val === 'string') {
+          const s = val.replace(/\u0000/g, '').trim();
+          if (s && !seen.has(s)) {
+            seen.add(s);
+            chunks.push(s);
+          }
+        }
+      };
+
+      // 1) High-yield sections first
+      for (const key of TEXT_BEARING_SECTIONS) {
+        if (Object.prototype.hasOwnProperty.call(labelData, key)) {
+          pushChunk(labelData[key]);
+        }
+      }
+
+      // 2) Catch-all sweep for any other string-ish fields (rare sponsor mappings)
+      for (const [k, v] of Object.entries(labelData)) {
+        if (TEXT_BEARING_SECTIONS.includes(k)) continue;
+        if (typeof v === 'string') pushChunk(v);
+        else if (Array.isArray(v) && v.every(x => typeof x === 'string' || Array.isArray(x))) pushChunk(v);
+      }
+
+      return chunks.join('\n\n');
+    })();
+
+    // Parse manufacturing lines (“Manufactured by/for/Distributed/Marketed by”)
+    const manufacturingInfo = (() => {
+      const info = {
+        manufactured_by: null,
+        manufactured_for: null,
+        distributed_by: null,
+        marketed_by: null,
+        product_of: null,
+        raw_snippet: null
+      };
+
+      const patterns = {
+        manufactured_by: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+by[:\s]+(.+?)(?=[;.\n]|$)/i,
+        manufactured_for: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+for[:\s]+(.+?)(?=[;.\n]|$)/i,
+        distributed_by: /\bDistributed\s+by[:\s]+(.+?)(?=[;.\n]|$)/i,
+        marketed_by: /\bMarketed\s+by[:\s]+(.+?)(?=[;.\n]|$)/i,
+        product_of: /\bProduct\s+of[:\s]+(.+?)(?=[;.\n]|$)/i
+      };
+
+
+      const lines = textCorpus
+        .split(/\r?\n/)
+        .map(s => s.replace(/\u0000/g, '').trim());
+
+      function startsNewBlock(s) {
+        return /^(Manufactured|Mfd\.?|Mfr\.|Distributed|Marketed|Product)\s+(by|for)\b/i.test(s);
+      }
+
+      function captureWithFollowing(lines, idx, initial) {
+        const out = [initial];
+        for (let i = idx + 1; i < Math.min(lines.length, idx + 4); i++) {
+          const s = lines[i].trim();
+          if (!s) break;
+          if (/^(Manufactured|Mfd\.?|Mfr\.|Distributed|Marketed|Product)\s+(by|for)\b/i.test(s)) break;
+          out.push(s);
+        }
+  return out.join(' ');
+}
+
+
+      function cleanOrg(s) {
+        return s.replace(/\s*(,|;|\.)\s*$/, '').replace(/\s{2,}/g, ' ').trim();
+      }
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line) continue;
+
+        for (const [key, rx] of Object.entries(patterns)) {
+          if (info[key]) continue; // keep first occurrence
+          const m = line.match(rx);
+          if (m) {
+            const captured = captureWithFollowing(lines, i, m[1].trim());
+            info[key] = cleanOrg(captured);
+            if (!info.raw_snippet) info.raw_snippet = line;
+          }
+        }
+      }
+
+      return info;
+    })();
 
     return {
-      final_manufacturer: manufacturingInfo.manufactured_by,
-      final_manufactured_for: manufacturingInfo.manufactured_for,
-      raw_snippet: manufacturingInfo.raw_snippet
+      final_manufacturer: manufacturingInfo.manufactured_by || null,
+      // Do not silently substitute distributed_by/marketed_by — surface null if absent
+      final_manufactured_for: manufacturingInfo.manufactured_for || null,
+      raw_snippet: manufacturingInfo.raw_snippet || null
     };
   } catch (error) {
-    console.error(`Error fetching label for SPL Set ID ${splSetId}:`, error.message);
-    return { final_manufacturer: `API Error: ${error.message}`, final_manufactured_for: null, raw_snippet: null };
+    console.error(`Error fetching label for SPL Set ID ${splSetId}:`, error?.message || error);
+    return {
+      final_manufacturer: `API Error: ${error?.message || String(error)}`,
+      final_manufactured_for: null,
+      raw_snippet: null
+    };
   }
 }
 
