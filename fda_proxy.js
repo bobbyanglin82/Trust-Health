@@ -52,32 +52,30 @@ async function downloadData() {
       }
       
       if (!labelApiUrl) {
-        product.manufacturer_name = 'N/A (No Link)';
+        product.manufacturer_name = product.labeler_name || 'N/A (No Link)';
+        product.manufactured_for = product.labeler_name || 'N/A (No Link)';
         return product;
       }
       
       try {
-        const labelResponse = await axios.get(labelApiUrl);
+        const labelResponse = await axios.get(apiUrl); // I changed this line
         if (labelResponse.data.results && labelResponse.data.results.length > 0) {
             const resultData = labelResponse.data.results[0]?.openfda;
             
-            // --- NEW DIAGNOSTIC LOG ---
-            if (product.product_ndc === '82009-182') {
-                console.log('--- RAW API RESPONSE for NDC 82009-182 ---');
-                console.log(JSON.stringify(resultData, null, 2));
-                console.log('-------------------------------------------');
-            }
-
             const manufacturer = resultData?.manufacturer_name?.[0];
-            const labeler = resultData?.labeler_name?.[0];
+            // FINAL WORKAROUND: If labeler is missing from the SPL data,
+            // fall back to the labeler from the initial NDC query.
+            const labeler = resultData?.labeler_name?.[0] || product.labeler_name;
 
             product.manufacturer_name = manufacturer || 'N/A (Not Found)';
             product.manufactured_for = labeler || 'N/A (Not Found)';
         } else {
             product.manufacturer_name = 'N/A (No SPL Match)';
+            product.manufactured_for = product.labeler_name;
         }
       } catch (e) {
         product.manufacturer_name = 'N/A (API Error)';
+        product.manufactured_for = product.labeler_name;
       }
       return product;
     });
