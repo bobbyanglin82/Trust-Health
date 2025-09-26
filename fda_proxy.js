@@ -181,11 +181,11 @@ async function fetchAndParseLabelFromAPI(splSetId) {
       };
 
       const patterns = {
-        manufactured_by: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+by[:\s]+(.+?)(?=[;.\n]|$)/i,
-        manufactured_for: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+for[:\s]+(.+?)(?=[;.\n]|$)/i,
-        distributed_by: /\bDistributed\s+by[:\s]+(.+?)(?=[;.\n]|$)/i,
-        marketed_by: /\bMarketed\s+by[:\s]+(.+?)(?=[;.\n]|$)/i,
-        product_of: /\bProduct\s+of[:\s]+(.+?)(?=[;.\n]|$)/i
+        manufactured_by: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+by[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
+        manufactured_for: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+for[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
+        distributed_by: /\bDistributed\s+by[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
+        marketed_by: /\bMarketed\s+by[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
+        product_of: /\bProduct\s+of[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i
       };
 
 
