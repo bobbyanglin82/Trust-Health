@@ -11,9 +11,8 @@ const knownEntities = [
   "ZINC HEALTH VENTURES", "ZINC HEALTH SERVICES", "EMISAR PHARMA SERVICES"
 ];
 
-// This function enriches data using the most robust 3-tier fallback logic
-// This function enriches data by correctly mapping manufacturer and labeler fields
 async function downloadData() {
+  console.log('--- Starting data download at', new Date().toLocaleTimeString(), '---');
   console.log('🔍 Stage 1: Querying the openFDA API for new NDC data...');
   
   const searchQuery = knownEntities.map(entity => `labeler_name:"${entity}"`).join('+OR+');
@@ -25,15 +24,14 @@ async function downloadData() {
     const initialResults = initialResponse.data.results;
 
     if (!initialResults || initialResults.length === 0) {
-      console.log('✅ No records found for the specified entities. This is normal.');
+      console.log('✅ No records found. Creating empty data file.');
       fs.writeFileSync(outputPath, '[]');
       return;
     }
     
-    console.log(`👍 Found ${initialResults.length} initial records. Starting Stage 2: Data Enrichment...`);
+    console.log(`👍 Found ${initialResults.length} records. Stage 2: Enriching data...`);
 
     const enrichmentPromises = initialResults.map(async (product) => {
-      // Set defaults
       product.manufacturer_name = 'N/A';
       product.manufactured_for = 'N/A';
 
@@ -47,16 +45,14 @@ async function downloadData() {
       } else if (prodId && prodId.includes('_')) {
         const splDocId = prodId.split('_')[1];
         if (splDocId) {
-            console.log(`- No SPL_SET_ID for ${product.product_ndc}. Using parsed ProductID: ${splDocId}`);
             labelApiUrl = `https://api.fda.gov/drug/label.json?search=id:"${splDocId}"&limit=1`;
         }
       } else if (appNumber) {
-        console.log(`- No SPL info for NDC ${product.product_ndc}. Falling back to Application #: ${appNumber}`);
         labelApiUrl = `https://api.fda.gov/drug/label.json?search=openfda.application_number:"${appNumber}"&limit=1`;
       }
       
       if (!labelApiUrl) {
-        product.manufacturer_name = 'N/A (No ID)';
+        product.manufacturer_name = 'N/A (No Link)';
         return product;
       }
       
@@ -65,38 +61,37 @@ async function downloadData() {
         if (labelResponse.data.results && labelResponse.data.results.length > 0) {
             const resultData = labelResponse.data.results[0]?.openfda;
             
-            // --- CORRECTED MAPPING ---
+            // --- NEW DIAGNOSTIC LOG ---
+            if (product.product_ndc === '82009-182') {
+                console.log('--- RAW API RESPONSE for NDC 82009-182 ---');
+                console.log(JSON.stringify(resultData, null, 2));
+                console.log('-------------------------------------------');
+            }
+
             const manufacturer = resultData?.manufacturer_name?.[0];
-            const labeler = resultData?.labeler_name?.[0]; // This is the "Manufactured For" entity
+            const labeler = resultData?.labeler_name?.[0];
 
             product.manufacturer_name = manufacturer || 'N/A (Not Found)';
             product.manufactured_for = labeler || 'N/A (Not Found)';
-            
         } else {
             product.manufacturer_name = 'N/A (No SPL Match)';
         }
       } catch (e) {
-        if (e.response && e.response.status === 404) {
-            product.manufacturer_name = 'N/A (No SPL Match)';
-        } else {
-            console.warn(`⚠️ API error fetching SPL data for NDC ${product.product_ndc}.`);
-            product.manufacturer_name = 'N/A (API Error)';
-        }
+        product.manufacturer_name = 'N/A (API Error)';
       }
       return product;
     });
 
     const enrichedResults = await Promise.all(enrichmentPromises);
-
     fs.writeFileSync(outputPath, JSON.stringify(enrichedResults, null, 2));
-    console.log(`✅ Successfully fetched and enriched ${enrichedResults.length} records.`);
+    console.log(`✅ File write to data.json complete.`);
 
   } catch (error) {
     if (error.response && error.response.status === 404) {
-      console.log('✅ No records found for the specified entities during initial fetch.');
+      console.log('✅ No initial records found. Creating empty data file.');
       fs.writeFileSync(outputPath, '[]');
     } else {
-      console.error('❌ An error occurred during the data download process:', error.message);
+      console.error('❌ Error during data download:', error.message);
     }
   }
 }
