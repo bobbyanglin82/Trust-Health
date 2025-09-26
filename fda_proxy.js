@@ -135,9 +135,17 @@ async function fetchAndParseLabelFromAPI(splSetId) {
     
     let textCorpus = '';
     TEXT_BEARING_SECTIONS.forEach(section => {
-      if (labelData[section] && Array.isArray(labelData[section])) {
-        textCorpus += labelData[section].join('\n') + '\n\n';
+      const value = labelData[section];
+      
+      // --- CRITICAL FIX ---
+      // This new logic correctly handles cases where the API returns a single string
+      // INSTEAD of an array of strings.
+      if (Array.isArray(value)) {
+        textCorpus += value.join('\n') + '\n\n';
+      } else if (typeof value === 'string') {
+        textCorpus += value + '\n\n';
       }
+      // --- END FIX ---
     });
 
     const manufacturingInfo = parseManufacturingInfo(textCorpus);
