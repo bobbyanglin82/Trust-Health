@@ -169,67 +169,7 @@ async function fetchAndParseLabelFromAPI(splSetId) {
       return chunks.join('\n\n');
     })();
 
-    // Parse manufacturing lines (“Manufactured by/for/Distributed/Marketed by”)
-    const manufacturingInfo = (() => {
-      const info = {
-        manufactured_by: null,
-        manufactured_for: null,
-        distributed_by: null,
-        marketed_by: null,
-        product_of: null,
-        raw_snippet: null
-      };
-
-      const patterns = {
-        manufactured_by: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+by[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
-        manufactured_for: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+for[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
-        distributed_by: /\bDistributed\s+by[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
-        marketed_by: /\bMarketed\s+by[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
-        product_of: /\bProduct\s+of[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i
-      };
-
-
-      const lines = textCorpus
-        .split(/\r?\n/)
-        .map(s => s.replace(/\u0000/g, '').trim());
-
-      function startsNewBlock(s) {
-        return /^(Manufactured|Mfd\.?|Mfr\.|Distributed|Marketed|Product)\s+(by|for)\b/i.test(s);
-      }
-
-      function captureWithFollowing(lines, idx, initial) {
-        const out = [initial];
-        for (let i = idx + 1; i < Math.min(lines.length, idx + 4); i++) {
-          const s = lines[i].trim();
-          if (!s) break;
-          if (/^(Manufactured|Mfd\.?|Mfr\.|Distributed|Marketed|Product)\s+(by|for)\b/i.test(s)) break;
-          out.push(s);
-        }
-  return out.join(' ');
-}
-
-
-      function cleanOrg(s) {
-        return s.replace(/\s*(,|;|\.)\s*$/, '').replace(/\s{2,}/g, ' ').trim();
-      }
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line) continue;
-
-        for (const [key, rx] of Object.entries(patterns)) {
-          if (info[key]) continue; // keep first occurrence
-          const m = line.match(rx);
-          if (m) {
-            const captured = captureWithFollowing(lines, i, m[1].trim());
-            info[key] = cleanOrg(captured);
-            if (!info.raw_snippet) info.raw_snippet = line;
-          }
-        }
-      }
-
-      return info;
-    })();
+    const manufacturingInfo = parseManufacturingInfo(textCorpus);
 
     return {
       final_manufacturer: manufacturingInfo.manufactured_by || null,
