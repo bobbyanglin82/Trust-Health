@@ -49,6 +49,9 @@ function parseManufacturingInfo(fullText) {
 /**
  * NEW FUNCTION: Fetches label data from the /drug/label API and prepares it for parsing.
  */
+/**
+ * CORRECTED FUNCTION: Fetches label data and builds a more comprehensive text corpus for parsing.
+ */
 async function fetchAndParseLabelFromAPI(splSetId) {
   if (!splSetId) {
     return { final_manufacturer: null, final_manufactured_for: null, raw_snippet: null };
@@ -64,14 +67,15 @@ async function fetchAndParseLabelFromAPI(splSetId) {
       return { final_manufacturer: 'N/A (Label Not Found in API)', final_manufactured_for: null, raw_snippet: null };
     }
 
-    // Combine relevant text sections into a single corpus for parsing.
-    // This replicates getting the "ground truth" text block.
+    // FIX: Add 'spl_unclassified_section_text' and other fields to the text corpus.
+    // This is the critical change that provides the necessary text to the parser.
     const textCorpus = [
+      labelData.principal_display_panel_text?.join('\n') || '',
+      labelData.how_supplied_section_text?.join('\n') || '',
+      labelData.spl_unclassified_section_text?.join('\n') || '', // <--- KEY ADDITION
       labelData.description_text?.join('\n') || '',
       labelData.indications_and_usage_text?.join('\n') || '',
-      labelData.how_supplied_section_text?.join('\n') || '',
-      labelData.spl_product_data_elements_text?.join('\n') || '',
-      labelData.principal_display_panel_text?.join('\n') || ''
+      labelData.spl_product_data_elements_text?.join('\n') || ''
     ].join('\n\n');
 
     const manufacturingInfo = parseManufacturingInfo(textCorpus);
