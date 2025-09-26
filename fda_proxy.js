@@ -3,8 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const cron = require('node-cron');
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium');
+// REMOVED: puppeteer and chromium dependencies are no longer needed.
 
 const app = express();
 
@@ -13,10 +12,7 @@ const knownEntities = [
   "ZINC HEALTH VENTURES", "ZINC HEALTH SERVICES", "EMISAR PHARMA SERVICES"
 ];
 
-/**
- * NEW HELPER FUNCTION (Implements Pipeline Step 4)
- * Parses raw label text to find "Manufactured by/for" statements.
- */
+// UNCHANGED: This parsing function is robust and works on any block of text.
 function parseManufacturingInfo(fullText) {
     const info = {
         manufactured_by: null,
@@ -24,92 +20,85 @@ function parseManufacturingInfo(fullText) {
         distributed_by: null,
         raw_snippet: null
     };
-
-    // Regex to find variants of manufacturing/distribution statements and capture the following text
     const patterns = {
-        manufactured_by: /Manufactured by:([\s\S]*?)(?=\n\n|Manufactured for:|Distributed by:|$)/i,
-        manufactured_for: /Manufactured for:([\s\S]*?)(?=\n\n|Manufactured by:|Distributed by:|$)/i,
-        distributed_by: /Distributed by:([\s\S]*?)(?=\n\n|Manufactured by:|Manufactured for:|$)/i
+        manufactured_by: /Manufactured by[:\s](.*)/i,
+        manufactured_for: /Manufactured for[:\s](.*)/i,
+        distributed_by: /Distributed by[:\s](.*)/i
     };
-
     let longestSnippet = '';
-
-    for (const key in patterns) {
-        const match = fullText.match(patterns[key]);
-        if (match && match[0]) {
-            // Store the full line as the raw snippet
-            if (match[0].length > longestSnippet.length) {
-                longestSnippet = match[0].trim();
+    const textLines = fullText.split('\n');
+    textLines.forEach(line => {
+        for (const key in patterns) {
+            const match = line.match(patterns[key]);
+            if (match && match[1]) {
+                const capturedText = match[1].trim();
+                if (!info[key]) info[key] = capturedText;
+                if (line.trim().length > longestSnippet.length) {
+                    longestSnippet = line.trim();
+                }
             }
-            // Store the captured company name/address
-            info[key] = match[1].trim().replace(/\s+/g, ' ');
         }
-    }
-    
+    });
     info.raw_snippet = longestSnippet || null;
-
-    // Logic to consolidate distributor/for fields
     if (!info.manufactured_for && info.distributed_by) {
         info.manufactured_for = info.distributed_by;
     }
-
     return info;
 }
 
-
 /**
- * UPDATED SCRAPING FUNCTION (Implements Pipeline Steps 3 & 4)
- * Scrapes the entire label text and then passes it to the parser.
+ * NEW FUNCTION: Fetches label data from the /drug/label API and prepares it for parsing.
  */
-async function scrapeAndParseLabel(splSetId, browser) {
-  if (!splSetId) return { final_manufacturer: null, final_manufactured_for: null };
+async function fetchAndParseLabelFromAPI(splSetId) {
+  if (!splSetId) {
+    return { final_manufacturer: null, final_manufactured_for: null, raw_snippet: null };
+  }
   
-  const dailyMedUrl = `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${splSetId}`;
-  let page;
+  const labelApiUrl = `https://api.fda.gov/drug/label.json?search=spl_set_id:"${splSetId}"&limit=1`;
+  
   try {
-    page = await browser.newPage();
-    await page.goto(dailyMedUrl, { waitUntil: 'networkidle2' });
+    const response = await axios.get(labelApiUrl);
+    const labelData = response.data.results?.[0];
 
-    // Step 3: Pull the full SPL text from the body
-    const labelText = await page.evaluate(() => document.body.innerText);
-    
-    // Step 4: Parse the text to find the structured info
-    const manufacturingInfo = parseManufacturingInfo(labelText);
-    
-    // Return the parsed data
+    if (!labelData) {
+      return { final_manufacturer: 'N/A (Label Not Found in API)', final_manufactured_for: null, raw_snippet: null };
+    }
+
+    // Combine relevant text sections into a single corpus for parsing.
+    // This replicates getting the "ground truth" text block.
+    const textCorpus = [
+      labelData.description_text?.join('\n') || '',
+      labelData.indications_and_usage_text?.join('\n') || '',
+      labelData.how_supplied_section_text?.join('\n') || '',
+      labelData.spl_product_data_elements_text?.join('\n') || '',
+      labelData.principal_display_panel_text?.join('\n') || ''
+    ].join('\n\n');
+
+    const manufacturingInfo = parseManufacturingInfo(textCorpus);
+
     return {
-        final_manufacturer: manufacturingInfo.manufactured_by,
-        final_manufactured_for: manufacturingInfo.manufactured_for || manufacturingInfo.distributed_by,
-        raw_snippet: manufacturingInfo.raw_snippet,
-        source_url: dailyMedUrl
+      final_manufacturer: manufacturingInfo.manufactured_by,
+      final_manufactured_for: manufacturingInfo.manufactured_for,
+      raw_snippet: manufacturingInfo.raw_snippet
     };
-
   } catch (error) {
-    console.error(`Error scraping ${dailyMedUrl}:`, error.message);
-    return { final_manufacturer: `Scrape Error: ${error.message}`, final_manufactured_for: null, raw_snippet: null, source_url: dailyMedUrl };
-  } finally {
-    if (page) await page.close();
+    console.error(`Error fetching label for SPL Set ID ${splSetId}:`, error.message);
+    return { final_manufacturer: `API Error: ${error.message}`, final_manufactured_for: null, raw_snippet: null };
   }
 }
 
-
+/**
+ * REWRITTEN FUNCTION: The main data processing function, now using the dual-API approach.
+ */
 async function downloadData() {
   console.log('--- Starting data download at', new Date().toLocaleTimeString(), '---');
   
-  // Step 1: Normalize the NDC (handled implicitly by using the API)
   const searchQuery = knownEntities.map(entity => `labeler_name:"${entity}"`).join('+OR+');
   const apiUrl = `https://api.fda.gov/drug/ndc.json?search=${searchQuery}&limit=1000`;
   const outputPath = path.join(__dirname, 'data.json');
   
-  let browser;
   try {
-    browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    });
-    
+    // Step 1: Get the initial list of products
     const initialResponse = await axios.get(apiUrl);
     const initialResults = initialResponse.data.results;
 
@@ -119,16 +108,15 @@ async function downloadData() {
       return;
     }
     
-    console.log(`👍 Found ${initialResults.length} records. Enriching...`);
+    console.log(`👍 Found ${initialResults.length} records. Enriching via Label API...`);
 
+    // Step 2: Enrich each product by calling the /drug/label API
     const enrichmentPromises = initialResults.map(async (product) => {
-      // Step 2: Find the SPL record tied to that NDC
       const splSetId = product.spl_set_id?.[0] || product.spl_set_id;
 
-      // Steps 3 & 4 are now inside this function call
-      const parsedInfo = await scrapeAndParseLabel(splSetId, browser);
+      // This new function replaces the entire puppeteer/scraping workflow
+      const parsedInfo = await fetchAndParseLabelFromAPI(splSetId);
 
-      // Step 5: Map back to the NDC and persist
       return {
           product_ndc: product.product_ndc,
           labeler_name: product.labeler_name,
@@ -138,9 +126,9 @@ async function downloadData() {
           marketing_end_date: product.marketing_end_date,
           manufacturer_name: parsedInfo.final_manufacturer || 'N/A (Not Found on Label)',
           manufactured_for: parsedInfo.final_manufactured_for || product.labeler_name,
-          // New fields for auditing and quality control
           raw_manufacturing_snippet: parsedInfo.raw_snippet,
-          source_spl_url: parsedInfo.source_url
+          // We can still link to DailyMed for auditing, even if we don't scrape it
+          source_spl_url: `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${splSetId}`
       };
     });
 
@@ -150,9 +138,8 @@ async function downloadData() {
 
   } catch (error) {
     console.error('❌ Error during data download:', error.message);
-  } finally {
-    if (browser) await browser.close();
   }
+  // REMOVED: The browser.close() in the 'finally' block is no longer needed.
 }
 
 // --- Server Routes & Startup (No changes needed) ---
