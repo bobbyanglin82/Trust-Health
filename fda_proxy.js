@@ -3,16 +3,88 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const cron = require('node-cron');
-// REMOVED: puppeteer and chromium dependencies are no longer needed.
 
 const app = express();
+
+// A comprehensive list of all known text-bearing sections in the drug/label API
+const TEXT_BEARING_SECTIONS = [
+    'abuse_and_overdosage_text',
+    'accessories_text',
+    'active_ingredient_text',
+    'adverse_reactions_text',
+    'alarms_text',
+    'animal_pharmacology_and_or_toxicology_text',
+    'assembly_or_installation_instructions_text',
+    'boxed_warning_text',
+    'calibration_instructions_text',
+    'cleaning_and_sterilization_text',
+    'clinical_pharmacology_text',
+    'clinical_studies_text',
+    'compatible_accessories_text',
+    'complaint_file_text',
+    'contraindications_text',
+    'controlled_substance_text',
+    'dependence_text',
+    'description_text',
+    'disposal_and_waste_handling_text',
+    'dosage_and_administration_text',
+    'drug_abuse_and_dependence_text',
+    'drug_and_or_laboratory_test_interactions_text',
+    'drug_interactions_text',
+    'environmental_warning_text',
+    'geriatric_use_text',
+    'guaranteed_analysis_of_feed_text',
+    'health_claim_text',
+    'how_supplied_section_text',
+    'inactive_ingredient_text',
+    'indications_and_usage_text',
+    'information_for_owners_or_caregivers_text',
+    'information_for_patients_text',
+    'instructions_for_use_text',
+    'intended_use_of_the_device_text',
+    'laboratory_tests_text',
+    'labor_and_delivery_text',
+    'mechanism_of_action_text',
+    'microbiology_text',
+    'nonclinical_toxicology_text',
+    'nursing_mothers_text',
+    'other_safety_information_text',
+    'overdosage_text',
+    'package_label_principal_display_panel_text',
+    'pediatric_use_text',
+    'pharmacodynamics_text',
+    'pharmacogenomics_text',
+    'pharmacokinetics_text',
+    'precautions_text',
+    'pregnancy_text',
+    'principal_display_panel_text',
+    'purpose_text',
+    'questions_text',
+    'recent_major_changes_text',
+    'references_text',
+    'risks_text',
+    'safe_handling_warning_text',
+    'spl_medguide_text',
+    'spl_patient_package_insert_text',
+    'spl_product_data_elements_text',
+    'spl_unclassified_section_text',
+    'statement_of_identity_text',
+    'storage_and_handling_text',
+    'summary_of_safety_and_effectiveness_text',
+    'teratogenic_effects_text',
+    'troubleshooting_text',
+    'use_in_specific_populations_text',
+    'user_safety_warnings_text',
+    'warnings_and_cautions_text',
+    'warnings_text',
+    'when_using_text'
+];
 
 const knownEntities = [
   "QUALLENT", "CORDAVIS", "OPTUM HEALTH SOLUTIONS", 
   "ZINC HEALTH VENTURES", "ZINC HEALTH SERVICES", "EMISAR PHARMA SERVICES"
 ];
 
-// UNCHANGED: This parsing function is robust and works on any block of text.
 function parseManufacturingInfo(fullText) {
     const info = {
         manufactured_by: null,
@@ -46,12 +118,6 @@ function parseManufacturingInfo(fullText) {
     return info;
 }
 
-/**
- * NEW FUNCTION: Fetches label data from the /drug/label API and prepares it for parsing.
- */
-/**
- * CORRECTED FUNCTION: Fetches label data and builds a more comprehensive text corpus for parsing.
- */
 async function fetchAndParseLabelFromAPI(splSetId) {
   if (!splSetId) {
     return { final_manufacturer: null, final_manufactured_for: null, raw_snippet: null };
@@ -66,17 +132,13 @@ async function fetchAndParseLabelFromAPI(splSetId) {
     if (!labelData) {
       return { final_manufacturer: 'N/A (Label Not Found in API)', final_manufactured_for: null, raw_snippet: null };
     }
-
-    // FIX: Add 'spl_unclassified_section_text' and other fields to the text corpus.
-    // This is the critical change that provides the necessary text to the parser.
-    const textCorpus = [
-      labelData.principal_display_panel_text?.join('\n') || '',
-      labelData.how_supplied_section_text?.join('\n') || '',
-      labelData.spl_unclassified_section_text?.join('\n') || '', // <--- KEY ADDITION
-      labelData.description_text?.join('\n') || '',
-      labelData.indications_and_usage_text?.join('\n') || '',
-      labelData.spl_product_data_elements_text?.join('\n') || ''
-    ].join('\n\n');
+    
+    let textCorpus = '';
+    TEXT_BEARING_SECTIONS.forEach(section => {
+      if (labelData[section] && Array.isArray(labelData[section])) {
+        textCorpus += labelData[section].join('\n') + '\n\n';
+      }
+    });
 
     const manufacturingInfo = parseManufacturingInfo(textCorpus);
 
@@ -91,9 +153,6 @@ async function fetchAndParseLabelFromAPI(splSetId) {
   }
 }
 
-/**
- * REWRITTEN FUNCTION: The main data processing function, now using the dual-API approach.
- */
 async function downloadData() {
   console.log('--- Starting data download at', new Date().toLocaleTimeString(), '---');
   
@@ -102,7 +161,6 @@ async function downloadData() {
   const outputPath = path.join(__dirname, 'data.json');
   
   try {
-    // Step 1: Get the initial list of products
     const initialResponse = await axios.get(apiUrl);
     const initialResults = initialResponse.data.results;
 
@@ -114,11 +172,8 @@ async function downloadData() {
     
     console.log(`👍 Found ${initialResults.length} records. Enriching via Label API...`);
 
-    // Step 2: Enrich each product by calling the /drug/label API
     const enrichmentPromises = initialResults.map(async (product) => {
       const splSetId = product.spl_set_id?.[0] || product.spl_set_id;
-
-      // This new function replaces the entire puppeteer/scraping workflow
       const parsedInfo = await fetchAndParseLabelFromAPI(splSetId);
 
       return {
@@ -131,7 +186,6 @@ async function downloadData() {
           manufacturer_name: parsedInfo.final_manufacturer || 'N/A (Not Found on Label)',
           manufactured_for: parsedInfo.final_manufactured_for || product.labeler_name,
           raw_manufacturing_snippet: parsedInfo.raw_snippet,
-          // We can still link to DailyMed for auditing, even if we don't scrape it
           source_spl_url: `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${splSetId}`
       };
     });
@@ -143,10 +197,9 @@ async function downloadData() {
   } catch (error) {
     console.error('❌ Error during data download:', error.message);
   }
-  // REMOVED: The browser.close() in the 'finally' block is no longer needed.
 }
 
-// --- Server Routes & Startup (No changes needed) ---
+// --- Server Routes & Startup (No changes) ---
 cron.schedule('0 8 * * *', () => downloadData(), { timezone: "UTC" });
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
