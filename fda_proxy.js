@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const cron = require('node-cron');
+const puppeteer = require('puppeteer');
 
 const app = express();
 
@@ -11,13 +12,51 @@ const knownEntities = [
   "ZINC HEALTH VENTURES", "ZINC HEALTH SERVICES", "EMISAR PHARMA SERVICES"
 ];
 
+// New helper function to scrape the true manufacturer from DailyMed
+async function scrapeManufacturer(splSetId, browser) {
+  if (!splSetId) return null;
+  
+  const dailyMedUrl = `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${splSetId}`;
+  let page;
+  try {
+    page = await browser.newPage();
+    await page.goto(dailyMedUrl, { waitUntil: 'networkidle2' });
+
+    // This function runs in the browser context to find the manufacturer text
+    const manufacturerText = await page.evaluate(() => {
+      // Find all text nodes on the page
+      const allTextNodes = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+      let currentNode;
+      while (currentNode = allTextNodes.nextNode()) {
+        const text = currentNode.nodeValue.trim();
+        // Check if the text contains "Manufactured by:"
+        if (text.toLowerCase().startsWith('manufactured by:')) {
+          // Return the text, removing the "Manufactured by:" part
+          return text.substring(16).trim();
+        }
+      }
+      return null;
+    });
+    
+    return manufacturerText;
+  } catch (error) {
+    console.error(`Error scraping ${dailyMedUrl}:`, error.message);
+    return null;
+  } finally {
+    if (page) await page.close();
+  }
+}
+
+
 async function downloadData() {
   console.log('--- Starting data download at', new Date().toLocaleTimeString(), '---');
-  console.log('🔍 Stage 1: Querying the openFDA API for new NDC data...');
+  console.log('🔍 Stage 1: Querying the openFDA API for initial data...');
   
   const searchQuery = knownEntities.map(entity => `labeler_name:"${entity}"`).join('+OR+');
   const apiUrl = `https://api.fda.gov/drug/ndc.json?search=${searchQuery}&limit=1000`;
   const outputPath = path.join(__dirname, 'data.json');
+
+  const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 
   try {
     const initialResponse = await axios.get(apiUrl);
@@ -29,54 +68,16 @@ async function downloadData() {
       return;
     }
     
-    console.log(`👍 Found ${initialResults.length} records. Stage 2: Enriching data...`);
+    console.log(`👍 Found ${initialResults.length} records. Stage 2: Enriching with scraped data...`);
 
     const enrichmentPromises = initialResults.map(async (product) => {
-      product.manufacturer_name = 'N/A';
-      product.manufactured_for = 'N/A';
+      const splSetId = product.spl_set_id?.[0] || product.spl_set_id;
 
-      let labelApiUrl = '';
-      const setId = product.spl_set_id;
-      const prodId = product.product_id;
-      const appNumber = product.application_number;
+      const scrapedManufacturer = await scrapeManufacturer(splSetId, browser);
 
-      if (setId) {
-        labelApiUrl = `https://api.fda.gov/drug/label.json?search=spl_set_id:"${setId}"&limit=1`;
-      } else if (prodId && prodId.includes('_')) {
-        const splDocId = prodId.split('_')[1];
-        if (splDocId) {
-            labelApiUrl = `https://api.fda.gov/drug/label.json?search=id:"${splDocId}"&limit=1`;
-        }
-      } else if (appNumber) {
-        labelApiUrl = `https://api.fda.gov/drug/label.json?search=openfda.application_number:"${appNumber}"&limit=1`;
-      }
-      
-      if (!labelApiUrl) {
-        product.manufacturer_name = 'N/A (No Link)';
-        product.manufactured_for = product.labeler_name; // Fallback for "mfd for"
-        return product;
-      }
-      
-      try {
-        // THIS LINE IS NOW CORRECTED
-        const labelResponse = await axios.get(labelApiUrl);
+      product.manufacturer_name = scrapedManufacturer || product.labeler_name; // Fallback to labeler if scrape fails
+      product.manufactured_for = product.labeler_name;
 
-        if (labelResponse.data.results && labelResponse.data.results.length > 0) {
-            const resultData = labelResponse.data.results[0]?.openfda;
-            
-            const manufacturer = resultData?.manufacturer_name?.[0];
-            const labeler = resultData?.labeler_name?.[0] || product.labeler_name;
-
-            product.manufacturer_name = manufacturer || 'N/A (Not Found)';
-            product.manufactured_for = labeler || 'N/A (Not Found)';
-        } else {
-            product.manufacturer_name = 'N/A (No SPL Match)';
-            product.manufactured_for = product.labeler_name; // Fallback for "mfd for"
-        }
-      } catch (e) {
-        product.manufacturer_name = 'N/A (API Error)';
-        product.manufactured_for = product.labeler_name; // Fallback for "mfd for"
-      }
       return product;
     });
 
@@ -85,16 +86,13 @@ async function downloadData() {
     console.log(`✅ File write to data.json complete.`);
 
   } catch (error) {
-    if (error.response && error.response.status === 404) {
-      console.log('✅ No initial records found. Creating empty data file.');
-      fs.writeFileSync(outputPath, '[]');
-    } else {
-      console.error('❌ Error during data download:', error.message);
-    }
+    console.error('❌ Error during data download:', error.message);
+  } finally {
+    await browser.close();
   }
 }
 
-// --- Server Routes & Startup (No changes needed below this line) ---
+// --- Server Routes & Startup ---
 cron.schedule('0 8 * * *', () => downloadData(), { timezone: "UTC" });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -110,7 +108,7 @@ const PORT = process.env.PORT || 3001;
 
 async function startServer() {
   console.log('--- Server starting up ---');
-  console.log('Executing initial data download. The server will not accept connections until this is complete.');
+  console.log('Executing initial data download. This may take several minutes due to web scraping.');
   
   await downloadData();
   
