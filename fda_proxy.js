@@ -114,9 +114,18 @@ app.get("/data", (req, res) => {
   res.sendFile(dataPath);
 });
 
-// --- Server Start ---
+// --- CORRECTED Server Start Logic for Render ---
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  downloadData(); // Run once on startup
-});
+
+async function startServer() {
+  console.log('--- Server starting up ---');
+  console.log('Executing initial data download. The server will not accept connections until this is complete.');
+  
+  await downloadData();
+  
+  app.listen(PORT, () => {
+    console.log(`✅ Data is ready. Server is now live and listening on port ${PORT}`);
+  });
+}
+
+startServer();
