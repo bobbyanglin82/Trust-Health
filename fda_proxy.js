@@ -113,6 +113,29 @@ app.get("/data", (req, res) => {
   const dataPath = path.join(__dirname, 'data.json');
   res.sendFile(dataPath);
 });
+// ... keep all the code above this line the same ...
+
+cron.schedule('0 8 * * *', () => downloadData(), { timezone: "UTC" });
+
+// --- Server Routes ---
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/ndc.html', (req, res) => res.sendFile(path.join(__dirname, 'ndc.html')));
+
+app.get("/data", (req, res) => {
+  const dataPath = path.join(__dirname, 'data.json');
+  res.sendFile(dataPath);
+});
+
+
+// --- DIAGNOSTIC ROUTE TO CHECK SCRIPT VERSION ---
+const SCRIPT_VERSION = "V5_FINAL_DEPLOY_TEST"; 
+app.get("/verify-version", (req, res) => {
+  res.setHeader('Content-Type', 'text/plain');
+  res.send(`The script running on the server is version: ${SCRIPT_VERSION}`);
+});
+// --------------------------------------------------
+
 
 // --- CORRECTED Server Start Logic for Render ---
 const PORT = process.env.PORT || 3001;
