@@ -84,12 +84,13 @@ function parseManufacturingInfo(fullText) {
 }
 
 async function fetchAndParseLabelFromAPI(splSetId) {
+  // This block now correctly returns null without causing an error.
   if (!splSetId) {
     return {
       final_manufacturer: null,
       final_manufactured_for: null,
       raw_snippet: null,
-      raw_spl_data: labelData
+      raw_spl_data: null // Return null for the raw data as well
     };
   }
 
@@ -97,32 +98,26 @@ async function fetchAndParseLabelFromAPI(splSetId) {
 
   try {
     const response = await axios.get(labelApiUrl);
-    const labelData = response?.data?.results?.[0];
+    const labelData = response?.data?.results?.[0]; // labelData is correctly defined here
 
     if (!labelData) {
       return {
         final_manufacturer: 'N/A (Label Not Found in API)',
         final_manufactured_for: null,
-        raw_snippet: null
+        raw_snippet: null,
+        raw_spl_data: null // Return null for the raw data
       };
     }
 
+    // The textCorpus and parsing logic remains the same
     const TEXT_BEARING_SECTIONS = [
-      'principal_display_panel',
-      'package_label_principal_display_panel',
-      'how_supplied',
-      'how_supplied_table',
-      'description',
-      'spl_unclassified_section',
-      'title',
-      'information_for_patients',
-      'instructions_for_use'
+      'principal_display_panel', 'package_label_principal_display_panel', 'how_supplied',
+      'how_supplied_table', 'description', 'spl_unclassified_section', 'title',
+      'information_for_patients', 'instructions_for_use'
     ];
-
     const textCorpus = (() => {
       const seen = new Set();
       const chunks = [];
-
       const pushChunk = (val) => {
         if (!val) return;
         if (Array.isArray(val)) {
@@ -137,28 +132,26 @@ async function fetchAndParseLabelFromAPI(splSetId) {
           }
         }
       };
-
       for (const key of TEXT_BEARING_SECTIONS) {
         if (Object.prototype.hasOwnProperty.call(labelData, key)) {
           pushChunk(labelData[key]);
         }
       }
-
       for (const [k, v] of Object.entries(labelData)) {
         if (TEXT_BEARING_SECTIONS.includes(k)) continue;
         if (typeof v === 'string') pushChunk(v);
         else if (Array.isArray(v) && v.every(x => typeof x === 'string' || Array.isArray(x))) pushChunk(v);
       }
-
       return chunks.join('\n\n');
     })();
-
     const manufacturingInfo = parseManufacturingInfo(textCorpus);
 
+    // This return statement now correctly includes the raw labelData
     return {
       final_manufacturer: manufacturingInfo.manufactured_by || null,
       final_manufactured_for: manufacturingInfo.manufactured_for || null,
-      raw_snippet: manufacturingInfo.raw_snippet || null
+      raw_snippet: manufacturingInfo.raw_snippet || null,
+      raw_spl_data: labelData
     };
 
   } catch (error) {
@@ -166,7 +159,8 @@ async function fetchAndParseLabelFromAPI(splSetId) {
     return {
       final_manufacturer: `API Error: ${error?.message || String(error)}`,
       final_manufactured_for: null,
-      raw_snippet: null
+      raw_snippet: null,
+      raw_spl_data: null // Return null on error
     };
   }
 }
