@@ -129,7 +129,9 @@ async function fetchAndParseLabelFromAPI(splSetId) {
       'how_supplied_table',
       'description',
       'spl_unclassified_section',
-      'title'
+      'title',
+      'information_for_patients',
+      'instructions_for_use'
     ];
 
     // Build a robust text corpus (dedup, flatten, include odd sponsor mappings)
