@@ -193,7 +193,7 @@ for (const product of initialResults) {
   const parsedInfo = await fetchAndParseLabelFromAPI(splSetId);
 
   if (!parsedInfo.raw_spl_data) {
-    console.log(`[DEBUG] Could not fetch SPL Label for NDC: ${product.product_ndc}`);
+    console.log(`[DEBUG] Could not fetch SPL Label for NDC: ${product.product_ndc} (using SPL Set ID: ${splSetId})`);
   }
 
   if (parsedInfo.raw_spl_data) {
