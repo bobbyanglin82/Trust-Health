@@ -44,7 +44,24 @@ function parseManufacturingInfo(fullText) {
   let match;
   while ((match = pattern.exec(normalizedText)) !== null) {
     const key = match[1].toLowerCase();
-    let value = match[2].trim().replace(/[,.;\s]*$/, '').trim();
+    // --- START: New Refining Logic ---
+    let rawBlock = match[2].trim();
+
+    // 1. Stop at common keywords that are not part of a company name.
+    const stopKeywords = ['U.S. License', 'Revised', 'NDC'];
+    for (const keyword of stopKeywords) {
+      const index = rawBlock.toUpperCase().indexOf(keyword.toUpperCase());
+      if (index !== -1) {
+        rawBlock = rawBlock.substring(0, index).trim();
+      }
+    }
+
+    // 2. Take only the first line of the remaining text block.
+    let value = rawBlock.split('\n')[0].trim();
+
+    // 3. Clean up any trailing punctuation from that first line.
+    value = value.replace(/[,.;\s]*$/, '').trim();
+    // --- END: New Refining Logic ---
     if (key.includes('manufactured by')) {
       if (!info.manufactured_by) info.manufactured_by = value;
     } else if (key.includes('manufactured for')) {
