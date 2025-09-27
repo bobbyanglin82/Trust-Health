@@ -88,7 +88,8 @@ async function fetchAndParseLabelFromAPI(splSetId) {
     return {
       final_manufacturer: null,
       final_manufactured_for: null,
-      raw_snippet: null
+      raw_snippet: null,
+      raw_spl_data: labelData
     };
   }
 
@@ -172,6 +173,7 @@ async function fetchAndParseLabelFromAPI(splSetId) {
 
 
 async function downloadData() {
+  let rawLabelDataForExport = [];
   console.log('--- Starting data download at', new Date().toLocaleTimeString(), '---');
   
   const searchQuery = knownEntities.map(entity => `labeler_name:"${entity}"`).join('+OR+');
@@ -194,6 +196,10 @@ async function downloadData() {
       const splSetId = product.spl_set_id?.[0] || product.spl_set_id;
       const parsedInfo = await fetchAndParseLabelFromAPI(splSetId);
 
+      if (parsedInfo.raw_spl_data) { // <-- ADD THIS IF BLOCK
+        rawLabelDataForExport.push(parsedInfo.raw_spl_data);
+      }
+      
       return {
           product_ndc: product.product_ndc,
           labeler_name: product.labeler_name,
@@ -209,6 +215,12 @@ async function downloadData() {
     });
 
     const enrichedResults = await Promise.all(enrichmentPromises);
+    // --- START: ADD THIS BLOCK TO SAVE THE DEBUG FILE ---
+    if (rawLabelDataForExport.length > 0) {
+        const debugOutputPath = path.join(__dirname, 'debug_raw_spl_data.json');
+        fs.writeFileSync(debugOutputPath, JSON.stringify(rawLabelDataForExport, null, 2));
+        console.log(`[DEBUG] Saved raw SPL data for ${rawLabelDataForExport.length} records to ${debugOutputPath}`);
+    }
     fs.writeFileSync(outputPath, JSON.stringify(enrichedResults, null, 2));
     console.log(`✅ File write to data.json complete.`);
 
