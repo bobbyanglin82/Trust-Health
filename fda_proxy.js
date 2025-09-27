@@ -34,59 +34,50 @@ function parseManufacturingInfo(fullText) {
     raw_snippet: null
   };
 
-  const patterns = {
-    manufactured_by: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+by[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
-    manufactured_for: /\b(?:Manufactured|Mfd\.?|Mfr\.)\s+for[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
-    distributed_by: /\bDistributed\s+by[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
-    marketed_by: /\bMarketed\s+by[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i,
-    product_of: /\bProduct\s+of[:\s]*([\s\S]{1,200}?)\s*(?=[;.\n]|$)/i
-  };
+  // First, normalize the entire text block to handle inconsistencies
+  const normalizedText = fullText
+    .replace(/\u00a0/g, ' ')      // non-breaking spaces
+    .replace(/[“”]/g, '"')      // smart quotes
+    .replace(/[‘’]/g, "'")      // smart single quotes
+    .replace(/[‐‑‒–—―]/g, '-')  // all dash types
+    .replace(/(\r?\n)+/g, '\n') // collapse multiple newlines
+    .replace(/\s{2,}/g, ' ')    // collapse multiple spaces
+    .trim();
 
-  // Normalize special characters (smart quotes, em dashes, non-breaking spaces)
-  const normalizeUnicode = (s) =>
-    s.replace(/\u00a0/g, ' ')
-     .replace(/[“”]/g, '"')
-     .replace(/[‘’]/g, "'")
-     .replace(/[‐‑‒–—―]/g, '-')
-     .replace(/\s{2,}/g, ' ')
-     .trim();
+  // Define all possible prefixes that start a relevant data block.
+  const prefixes = [
+    'Manufactured by', 'Mfd. by', 'Mfr. by',
+    'Manufactured for', 'Mfd. for', 'Mfr. for',
+    'Distributed by', 'Marketed by', 'Packed by', 'Product of'
+  ];
 
-  const textLines = fullText
-    .split(/\r?\n/)
-    .map(s => normalizeUnicode(s));
+  // This single regex finds a prefix, captures the text after it,
+  // and intelligently stops before the next prefix or the end of the text.
+  const pattern = new RegExp(
+    `\\b(${prefixes.join('|')})[:\\s]*([\\s\\S]+?)(?=\\b(?:${prefixes.join('|')})|$)`,
+    'gi'
+  );
 
-  function startsNewBlock(s) {
-    return /^(Manufactured|Mfd\.?|Mfr\.|Distributed|Marketed|Product)\s+(by|for)\b/i.test(s);
-  }
+  let match;
+  while ((match = pattern.exec(normalizedText)) !== null) {
+    const key = match[1].toLowerCase();
+    // Clean up the captured value: remove trailing punctuation and trim whitespace
+    let value = match[2].trim().replace(/[,.;\s]*$/, '').trim();
 
-  function captureWithFollowing(lines, idx, initial) {
-    const out = [initial];
-    for (let i = idx + 1; i < Math.min(lines.length, idx + 4); i++) {
-      const s = lines[i].trim();
-      if (!s) break;
-      if (startsNewBlock(s)) break;
-      out.push(s);
+    if (key.includes('manufactured by')) {
+      if (!info.manufactured_by) info.manufactured_by = value;
+    } else if (key.includes('manufactured for')) {
+      if (!info.manufactured_for) info.manufactured_for = value;
+    } else if (key.includes('distributed by')) {
+      if (!info.distributed_by) info.distributed_by = value;
+    } else if (key.includes('marketed by')) {
+      if (!info.marketed_by) info.marketed_by = value;
+    } else if (key.includes('product of')) {
+        if (!info.product_of) info.product_of = value;
     }
-    return out.join(' ');
-  }
-
-  function cleanOrg(s) {
-    return s.replace(/\s*(,|;|\.)\s*$/, '').replace(/\s{2,}/g, ' ').trim();
-  }
-
-  for (let i = 0; i < textLines.length; i++) {
-    const line = textLines[i];
-    if (!line) continue;
-
-    for (const [key, rx] of Object.entries(patterns)) {
-      if (info[key]) continue;
-      const m = line.match(rx);
-      if (m) {
-        const captured = captureWithFollowing(textLines, i, m[1].trim());
-        info[key] = cleanOrg(captured);
-        if (!info.raw_snippet) info.raw_snippet = line;
-      }
-    }
+    
+    // Set a raw snippet from the first relevant match found
+    if (!info.raw_snippet) info.raw_snippet = match[0];
   }
 
   return info;
