@@ -186,34 +186,36 @@ async function downloadData() {
     
     console.log(`👍 Found ${initialResults.length} records. Enriching via Label API...`);
 
-    const enrichmentPromises = initialResults.map(async (product) => {
-      const splSetId = product.spl_set_id?.[0] || product.spl_set_id;
-      const parsedInfo = await fetchAndParseLabelFromAPI(splSetId);
+    // ADD THIS NEW BLOCK IN ITS PLACE
+const enrichedResults = [];
+for (const product of initialResults) {
+  const splSetId = product.spl_set_id?.[0] || product.spl_set_id;
+  const parsedInfo = await fetchAndParseLabelFromAPI(splSetId);
 
-      // --- START: ADD THIS DEBUGGING BLOCK ---
-      if (!parsedInfo.raw_spl_data) {
-        console.log(`[DEBUG] Could not fetch SPL Label for NDC: ${product.product_ndc}`);
-      }
-      
-      if (parsedInfo.raw_spl_data) { // <-- ADD THIS IF BLOCK
-        rawLabelDataForExport.push(parsedInfo.raw_spl_data);
-      }
-      
-      return {
-          product_ndc: product.product_ndc,
-          labeler_name: product.labeler_name,
-          brand_name: product.brand_name,
-          generic_name: product.generic_name,
-          marketing_start_date: product.marketing_start_date,
-          marketing_end_date: product.marketing_end_date,
-          manufacturer_name: parsedInfo.final_manufacturer || 'N/A (Not Found on Label)',
-          manufactured_for: parsedInfo.final_manufactured_for || product.labeler_name,
-          raw_manufacturing_snippet: parsedInfo.raw_snippet,
-          source_spl_url: `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${splSetId}`
-      };
-    });
+  if (!parsedInfo.raw_spl_data) {
+    console.log(`[DEBUG] Could not fetch SPL Label for NDC: ${product.product_ndc}`);
+  }
 
-    const enrichedResults = await Promise.all(enrichmentPromises);
+  if (parsedInfo.raw_spl_data) {
+    rawLabelDataForExport.push(parsedInfo.raw_spl_data);
+  }
+
+  enrichedResults.push({
+    product_ndc: product.product_ndc,
+    labeler_name: product.labeler_name,
+    brand_name: product.brand_name,
+    generic_name: product.generic_name,
+    marketing_start_date: product.marketing_start_date,
+    marketing_end_date: product.marketing_end_date,
+    manufacturer_name: parsedInfo.final_manufacturer || 'N/A (Not Found on Label)',
+    manufactured_for: parsedInfo.final_manufactured_for || product.labeler_name,
+    raw_manufacturing_snippet: parsedInfo.raw_snippet,
+    source_spl_url: `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${splSetId}`
+  });
+
+  // Optional: Add a small delay to be even safer, though sequential processing is often enough.
+  await new Promise(res => setTimeout(res, 50)); 
+}
     // --- START: ADD THIS BLOCK TO SAVE THE DEBUG FILE ---
     if (rawLabelDataForExport.length > 0) {
         const debugOutputPath = path.join(__dirname, 'debug_raw_spl_data.json');
