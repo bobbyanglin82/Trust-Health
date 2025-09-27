@@ -61,98 +61,80 @@ function parseManufacturingInfo(fullText) {
   return info;
 }
 
-async function fetchAndParseLabelFromAPI(splSetId) {
-  if (!splSetId) {
-    return { final_manufacturer: null, final_manufactured_for: null, raw_snippet: null, raw_spl_data: null };
-  }
-  const labelApiUrl = `https://api.fda.gov/drug/label.json?search=spl_set_id:"${splSetId}"&order=effective_time:desc&limit=1`;
-  try {
-    const response = await axios.get(labelApiUrl);
-    const labelData = response?.data?.results?.[0];
-    if (!labelData) {
-      return { final_manufacturer: 'N/A (Label Not Found in API)', final_manufactured_for: null, raw_snippet: null, raw_spl_data: null };
-    }
-    const TEXT_BEARING_SECTIONS = ['principal_display_panel', 'package_label_principal_display_panel', 'how_supplied', 'how_supplied_table', 'description', 'spl_unclassified_section', 'title', 'information_for_patients', 'instructions_for_use'];
-    const textCorpus = (() => {
-      const seen = new Set();
-      const chunks = [];
-      const pushChunk = (val) => {
-        if (!val) return;
-        if (Array.isArray(val)) { val.flat(Infinity).forEach(pushChunk); return; }
-        if (typeof val === 'string') {
-          const s = val.replace(/\u0000/g, '').trim();
-          if (s && !seen.has(s)) { seen.add(s); chunks.push(s); }
-        }
-      };
-      for (const key of TEXT_BEARING_SECTIONS) {
-        if (Object.prototype.hasOwnProperty.call(labelData, key)) { pushChunk(labelData[key]); }
-      }
-      for (const [k, v] of Object.entries(labelData)) {
-        if (TEXT_BEARING_SECTIONS.includes(k)) continue;
-        if (typeof v === 'string') pushChunk(v);
-        else if (Array.isArray(v) && v.every(x => typeof x === 'string' || Array.isArray(x))) pushChunk(v);
-      }
-      return chunks.join('\n\n');
-    })();
-    const manufacturingInfo = parseManufacturingInfo(textCorpus);
-    return {
-      final_manufacturer: manufacturingInfo.manufactured_by || null,
-      final_manufactured_for: manufacturingInfo.manufactured_for || null,
-      raw_snippet: manufacturingInfo.raw_snippet || null,
-      raw_spl_data: labelData
-    };
-  } catch (error) {
-    console.error(`Error fetching label for SPL Set ID ${splSetId}:`, error?.message || error);
-    return { final_manufacturer: `API Error: ${error?.message || String(error)}`, final_manufactured_for: null, raw_snippet: null, raw_spl_data: null };
-  }
-}
-
 async function downloadData() {
   let rawLabelDataForExport = [];
   console.log('--- Starting data download at', new Date().toLocaleTimeString(), '---');
-  const searchQuery = knownEntities.map(entity => `labeler_name:"${entity}"`).join('+OR+');
-  const apiUrl = `https://api.fda.gov/drug/ndc.json?search=${searchQuery}&limit=1000`;
+
+  // This new query searches the LABEL database directly for your entities.
+  const searchQuery = knownEntities.map(entity => `openfda.manufacturer_name:"${entity}"`).join('+OR+');
+  const apiUrl = `https://api.fda.gov/drug/label.json?search=${searchQuery}&limit=1000`;
   const outputPath = path.join('/tmp', 'data.json');
+
   try {
-    const initialResponse = await axios.get(apiUrl);
-    const initialResults = initialResponse.data.results;
-    if (!initialResults || initialResults.length === 0) {
-      console.log('✅ No records found.');
+    const response = await axios.get(apiUrl);
+    const labelResults = response.data.results;
+
+    if (!labelResults || labelResults.length === 0) {
+      console.log('✅ No records found for the specified entities in the Label API.');
       fs.writeFileSync(outputPath, '[]');
       return;
     }
-    console.log(`👍 Found ${initialResults.length} records. Enriching via Label API...`);
+
+    console.log(`👍 Found ${labelResults.length} records. Parsing and formatting...`);
+
     const enrichedResults = [];
-    for (const product of initialResults) {
-      const splSetId = product.spl_set_id?.[0] || product.spl_set_id;
-      const parsedInfo = await fetchAndParseLabelFromAPI(splSetId);
-      if (!parsedInfo.raw_spl_data) {
-        console.log(`[DEBUG] Could not fetch SPL Label for NDC: ${product.product_ndc} (using SPL Set ID: ${splSetId})`);
-      }
-      if (parsedInfo.raw_spl_data) {
-        rawLabelDataForExport.push(parsedInfo.raw_spl_data);
-      }
+    for (const labelData of labelResults) {
+      if (!labelData) continue;
+
+      // Save the raw data for debugging, as we did before
+      rawLabelDataForExport.push(labelData);
+
+      // Build the text corpus from the label data itself
+      const TEXT_BEARING_SECTIONS = ['principal_display_panel', 'package_label_principal_display_panel', 'how_supplied', 'how_supplied_table', 'description', 'spl_unclassified_section', 'title', 'information_for_patients', 'instructions_for_use'];
+      const textCorpus = (() => {
+        const seen = new Set();
+        const chunks = [];
+        const pushChunk = (val) => {
+          if (!val) return;
+          if (Array.isArray(val)) { val.flat(Infinity).forEach(pushChunk); return; }
+          if (typeof val === 'string') {
+            const s = val.replace(/\u0000/g, '').trim();
+            if (s && !seen.has(s)) { seen.add(s); chunks.push(s); }
+          }
+        };
+        for (const key of TEXT_BEARING_SECTIONS) {
+          if (Object.prototype.hasOwnProperty.call(labelData, key)) { pushChunk(labelData[key]); }
+        }
+        return chunks.join('\n\n');
+      })();
+
+      const manufacturingInfo = parseManufacturingInfo(textCorpus);
+
+      // Extract fields from the single API result
       enrichedResults.push({
-        product_ndc: product.product_ndc,
-        labeler_name: product.labeler_name,
-        brand_name: product.brand_name,
-        generic_name: product.generic_name,
-        marketing_start_date: product.marketing_start_date,
-        marketing_end_date: product.marketing_end_date,
-        manufacturer_name: parsedInfo.final_manufacturer || 'N/A (Not Found on Label)',
-        manufactured_for: parsedInfo.final_manufactured_for || product.labeler_name,
-        raw_manufacturing_snippet: parsedInfo.raw_snippet,
-        source_spl_url: `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${splSetId}`
+        product_ndc: labelData.openfda?.product_ndc?.[0] || 'N/A',
+        labeler_name: labelData.openfda?.manufacturer_name?.[0] || 'N/A',
+        brand_name: labelData.openfda?.brand_name?.[0] || 'N/A',
+        generic_name: labelData.openfda?.generic_name?.[0] || 'N/A',
+        marketing_start_date: labelData.effective_time || 'N/A',
+        marketing_end_date: 'N/A', // This field is not reliably available in the label endpoint
+        manufacturer_name: manufacturingInfo.manufactured_by || 'N/A (Not Found on Label)',
+        manufactured_for: manufacturingInfo.manufactured_for || labelData.openfda?.manufacturer_name?.[0] || 'N/A',
+        raw_manufacturing_snippet: manufacturingInfo.raw_snippet,
+        source_spl_url: `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${labelData.set_id}`
       });
-      await new Promise(res => setTimeout(res, 50));
     }
+
+    // Save the debug file if needed
     if (rawLabelDataForExport.length > 0) {
-      const debugOutputPath = path.join(__dirname, 'debug_raw_spl_data.json');
-      fs.writeFileSync(debugOutputPath, JSON.stringify(rawLabelDataForExport, null, 2));
-      console.log(`[DEBUG] Saved raw SPL data for ${rawLabelDataForExport.length} records to ${debugOutputPath}`);
+        const debugOutputPath = path.join(__dirname, 'debug_raw_spl_data.json');
+        fs.writeFileSync(debugOutputPath, JSON.stringify(rawLabelDataForExport, null, 2));
+        console.log(`[DEBUG] Saved raw SPL data for ${rawLabelDataForExport.length} records to ${debugOutputPath}`);
     }
+
     fs.writeFileSync(outputPath, JSON.stringify(enrichedResults, null, 2));
     console.log(`✅ File write to data.json complete.`);
+
   } catch (error) {
     console.error('❌ Error during data download:', error.message);
   }
