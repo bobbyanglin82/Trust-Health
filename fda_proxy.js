@@ -6,6 +6,7 @@ const cron = require('node-cron');
 
 const app = express();
 
+
 // A comprehensive list of all known text-bearing sections in the drug/label API
 const TEXT_BEARING_SECTIONS = [
   'principal_display_panel',
@@ -93,21 +94,14 @@ function parseManufacturingInfo(fullText) {
 
 async function fetchAndParseLabelFromAPI(splSetId) {
   if (!splSetId) {
-    return { final_manufacturer: null, final_manufactured_for: null, raw_snippet: null };
+    return {
+      final_manufacturer: null,
+      final_manufactured_for: null,
+      raw_snippet: null
+    };
   }
 
-  // Ask openFDA for the newest effective label and only the fields we care about
-  const fields = [
-    'id', 'set_id', 'effective_time',
-    'openfda.product_ndc', 'openfda.package_ndc',
-    'title',
-    'principal_display_panel', 'package_label_principal_display_panel',
-    'how_supplied', 'how_supplied_table',
-    'description', 'spl_unclassified_section'
-  ].join(',');
-
-  const labelApiUrl =
-    `https://api.fda.gov/drug/label.json?search=spl_set_id:"${splSetId}"&order=effective_time:desc&limit=1`;
+  const labelApiUrl = `https://api.fda.gov/drug/label.json?search=spl_set_id:"${splSetId}"&order=effective_time:desc&limit=1`;
 
   try {
     const response = await axios.get(labelApiUrl);
@@ -121,7 +115,6 @@ async function fetchAndParseLabelFromAPI(splSetId) {
       };
     }
 
-    // Preferred openFDA text-bearing sections
     const TEXT_BEARING_SECTIONS = [
       'principal_display_panel',
       'package_label_principal_display_panel',
@@ -134,7 +127,6 @@ async function fetchAndParseLabelFromAPI(splSetId) {
       'instructions_for_use'
     ];
 
-    // Build a robust text corpus (dedup, flatten, include odd sponsor mappings)
     const textCorpus = (() => {
       const seen = new Set();
       const chunks = [];
@@ -154,14 +146,12 @@ async function fetchAndParseLabelFromAPI(splSetId) {
         }
       };
 
-      // 1) High-yield sections first
       for (const key of TEXT_BEARING_SECTIONS) {
         if (Object.prototype.hasOwnProperty.call(labelData, key)) {
           pushChunk(labelData[key]);
         }
       }
 
-      // 2) Catch-all sweep for any other string-ish fields (rare sponsor mappings)
       for (const [k, v] of Object.entries(labelData)) {
         if (TEXT_BEARING_SECTIONS.includes(k)) continue;
         if (typeof v === 'string') pushChunk(v);
@@ -175,10 +165,10 @@ async function fetchAndParseLabelFromAPI(splSetId) {
 
     return {
       final_manufacturer: manufacturingInfo.manufactured_by || null,
-      // Do not silently substitute distributed_by/marketed_by — surface null if absent
       final_manufactured_for: manufacturingInfo.manufactured_for || null,
       raw_snippet: manufacturingInfo.raw_snippet || null
     };
+
   } catch (error) {
     console.error(`Error fetching label for SPL Set ID ${splSetId}:`, error?.message || error);
     return {
@@ -188,6 +178,7 @@ async function fetchAndParseLabelFromAPI(splSetId) {
     };
   }
 }
+
 
 async function downloadData() {
   console.log('--- Starting data download at', new Date().toLocaleTimeString(), '---');
