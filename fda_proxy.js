@@ -194,7 +194,7 @@ async function downloadData() {
   
   const searchQuery = knownEntities.map(entity => `labeler_name:"${entity}"`).join('+OR+');
   const apiUrl = `https://api.fda.gov/drug/ndc.json?search=${searchQuery}&limit=1000`;
-  const outputPath = path.join(__dirname, 'data.json');
+  const outputPath = path.join('/tmp', 'data.json');
   
   try {
     const initialResponse = await axios.get(apiUrl);
@@ -241,7 +241,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/ndc.html', (req, res) => res.sendFile(path.join(__dirname, 'ndc.html')));
 app.get("/data", (req, res) => {
-  const dataPath = path.join(__dirname, 'data.json');
+  const dataPath = path.join('/tmp', 'data.json');
   res.sendFile(dataPath);
 });
 const PORT = process.env.PORT || 3001;
