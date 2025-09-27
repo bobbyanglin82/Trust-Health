@@ -232,6 +232,16 @@ app.get("/data", (req, res) => {
   const dataPath = path.join('/tmp', 'data.json');
   res.sendFile(dataPath);
 });
+// --- START: Temporary Download Route for Debug File ---
+app.get("/debug-file", (req, res) => {
+  const filePath = path.join(__dirname, 'debug_raw_spl_data.json');
+  if (fs.existsSync(filePath)) {
+    res.download(filePath); // This prompts the user to download the file
+  } else {
+    res.status(404).send("Debug file not found. The downloadData script may not have completed successfully or created the file yet.");
+  }
+});
+// --- END: Temporary Download Route for Debug File ---
 const PORT = process.env.PORT || 3001;
 async function startServer() {
   console.log('--- Server starting up ---');
