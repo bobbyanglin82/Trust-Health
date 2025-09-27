@@ -190,6 +190,11 @@ async function downloadData() {
       const splSetId = product.spl_set_id?.[0] || product.spl_set_id;
       const parsedInfo = await fetchAndParseLabelFromAPI(splSetId);
 
+      // --- START: ADD THIS DEBUGGING BLOCK ---
+      if (!parsedInfo.raw_spl_data) {
+        console.log(`[DEBUG] Could not fetch SPL Label for NDC: ${product.product_ndc}`);
+      }
+      
       if (parsedInfo.raw_spl_data) { // <-- ADD THIS IF BLOCK
         rawLabelDataForExport.push(parsedInfo.raw_spl_data);
       }
