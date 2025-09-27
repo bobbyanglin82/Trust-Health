@@ -5,7 +5,7 @@ let allData = [];
 async function fetchData() {
   try {
     tbody.innerHTML = `<tr><td colspan="8">Loading latest data from server...</td></tr>`;
-    const response = await fetch('/data');
+    const response = await fetch(`/data?ts=${Date.now()}`);
     if (!response.ok) throw new Error('Network response was not ok');
     
     allData = await response.json();

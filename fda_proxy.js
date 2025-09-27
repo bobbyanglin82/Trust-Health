@@ -81,34 +81,50 @@ function parseManufacturingInfo(fullText) {
 async function downloadData() {
   let rawLabelDataForExport = [];
   console.log('--- Starting data download at', new Date().toLocaleTimeString(), '---');
-
-  // This new query searches the LABEL database directly for your entities.
+  
   const searchQuery = knownEntities.map(entity => `openfda.manufacturer_name:"${entity}"`).join('+OR+');
-  const apiUrl = `https://api.fda.gov/drug/label.json?search=${searchQuery}&limit=1000`;
+  const labelApiUrl = `https://api.fda.gov/drug/label.json?search=${searchQuery}&limit=1000`;
   const outputPath = path.join('/tmp', 'data.json');
 
   try {
-    const response = await axios.get(apiUrl);
-    const labelResults = response.data.results;
+    const labelResponse = await axios.get(labelApiUrl);
+    const labelResults = labelResponse.data.results;
 
     if (!labelResults || labelResults.length === 0) {
       console.log('✅ No records found for the specified entities in the Label API.');
       fs.writeFileSync(outputPath, '[]');
       return;
     }
-
-    console.log(`👍 Found ${labelResults.length} records. Parsing and formatting...`);
-
+    
+    console.log(`👍 Found ${labelResults.length} records. Fetching accurate NDC data...`);
+    
+    const allNdcs = labelResults.map(l => l.openfda?.product_ndc?.[0]).filter(Boolean);
+    const ndcDataMap = new Map();
+    
+    if (allNdcs.length > 0) {
+        const ndcSearchQuery = allNdcs.map(ndc => `product_ndc:"${ndc}"`).join('+OR+');
+        const ndcApiUrl = `https://api.fda.gov/drug/ndc.json?search=${ndcSearchQuery}&limit=${allNdcs.length}`;
+        const ndcResponse = await axios.get(ndcApiUrl);
+        if (ndcResponse.data.results) {
+            ndcResponse.data.results.forEach(product => {
+                // Store an object with all the data we need from this API call
+                ndcDataMap.set(product.product_ndc, {
+                    marketing_start_date: product.marketing_start_date,
+                    listing_expiration_date: product.listing_expiration_date,
+                    labeler_name: product.labeler_name,
+                    brand_name: product.brand_name,
+                    generic_name: product.generic_name
+                });
+            });
+        }
+    }
+    
     const enrichedResults = [];
     for (const labelData of labelResults) {
       if (!labelData) continue;
-
-      // Save the raw data for debugging, as we did before
-      rawLabelDataForExport.push(labelData);
-
-      // Build the text corpus from the label data itself
-      const TEXT_BEARING_SECTIONS = ['principal_display_panel', 'package_label_principal_display_panel', 'how_supplied', 'how_supplied_table', 'description', 'spl_unclassified_section', 'title', 'information_for_patients', 'instructions_for_use'];
+      
       const textCorpus = (() => {
+        const TEXT_BEARING_SECTIONS = ['principal_display_panel', 'package_label_principal_display_panel', 'how_supplied', 'how_supplied_table', 'description', 'spl_unclassified_section', 'title', 'information_for_patients', 'instructions_for_use'];
         const seen = new Set();
         const chunks = [];
         const pushChunk = (val) => {
@@ -124,29 +140,22 @@ async function downloadData() {
         }
         return chunks.join('\n\n');
       })();
-
+      
       const manufacturingInfo = parseManufacturingInfo(textCorpus);
-
-      // Extract fields from the single API result
+      const product_ndc = labelData.openfda?.product_ndc?.[0] || 'N/A';
+      const ndcData = ndcDataMap.get(product_ndc) || {};
+      
+      // Build the final, clean object in the desired order
       enrichedResults.push({
-        product_ndc: labelData.openfda?.product_ndc?.[0] || 'N/A',
-        labeler_name: labelData.openfda?.manufacturer_name?.[0] || 'N/A',
-        brand_name: labelData.openfda?.brand_name?.[0] || 'N/A',
-        generic_name: labelData.openfda?.generic_name?.[0] || 'N/A',
-        marketing_start_date: labelData.effective_time || 'N/A',
-        marketing_end_date: 'N/A', // This field is not reliably available in the label endpoint
+        product_ndc: product_ndc,
+        labeler_name: ndcData.labeler_name || 'N/A',
+        brand_name: ndcData.brand_name || 'N/A',
+        generic_name: ndcData.generic_name || 'N/A',
+        marketing_start_date: ndcData.marketing_start_date || labelData.effective_time || 'N/A',
+        listing_expiration_date: ndcData.listing_expiration_date || 'N/A',
         manufacturer_name: manufacturingInfo.manufactured_by || 'N/A (Not Found on Label)',
-        manufactured_for: manufacturingInfo.manufactured_for || labelData.openfda?.manufacturer_name?.[0] || 'N/A',
-        raw_manufacturing_snippet: manufacturingInfo.raw_snippet,
-        source_spl_url: `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${labelData.set_id}`
+        manufactured_for: manufacturingInfo.manufactured_for || ndcData.labeler_name || 'N/A'
       });
-    }
-
-    // Save the debug file if needed
-    if (rawLabelDataForExport.length > 0) {
-        const debugOutputPath = path.join(__dirname, 'debug_raw_spl_data.json');
-        fs.writeFileSync(debugOutputPath, JSON.stringify(rawLabelDataForExport, null, 2));
-        console.log(`[DEBUG] Saved raw SPL data for ${rawLabelDataForExport.length} records to ${debugOutputPath}`);
     }
 
     fs.writeFileSync(outputPath, JSON.stringify(enrichedResults, null, 2));
@@ -154,6 +163,8 @@ async function downloadData() {
 
   } catch (error) {
     console.error('❌ Error during data download:', error.message);
+    // Create an empty file on error so the site doesn't break
+    fs.writeFileSync(outputPath, '[]');
   }
 }
 

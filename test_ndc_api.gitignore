@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FDA NDC API Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        textarea { width: 100%; height: 100px; margin-bottom: 1em; }
+        button { padding: 10px 15px; font-size: 16px; }
+        pre { background-color: #f4f4f4; padding: 1em; border: 1px solid #ddd; white-space: pre-wrap; word-wrap: break-word; }
+        #error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>FDA NDC Database API Test</h1>
+    <p>This page tests the <strong>/drug/ndc.json</strong> endpoint and filters the results.</p>
+
+    <label for="ndc-input">Enter NDCs (separated by commas):</label>
+    <textarea id="ndc-input">83457-651, 82009-143, 82009-163</textarea>
+
+    <button id="run-button">Run Test Query</button>
+
+    <h2>Filtered API Results:</h2>
+    <div id="error"></div>
+    <pre id="results">Click the button to see results.</pre>
+
+    <script>
+        document.getElementById('run-button').addEventListener('click', async () => {
+            const ndcInput = document.getElementById('ndc-input').value;
+            const resultsPre = document.getElementById('results');
+            const errorDiv = document.getElementById('error');
+            
+            resultsPre.textContent = 'Loading...';
+            errorDiv.textContent = '';
+
+            const ndcs = ndcInput.split(',')
+                                 .map(ndc => ndc.trim())
+                                 .filter(ndc => ndc.length > 0);
+
+            if (ndcs.length === 0) {
+                resultsPre.textContent = 'Please enter at least one NDC.';
+                return;
+            }
+
+            const ndcSearchQuery = ndcs.map(ndc => `product_ndc:"${ndc}"`).join('+OR+');
+            const apiUrl = `https://api.fda.gov/drug/ndc.json?search=${ndcSearchQuery}&limit=${ndcs.length}`;
+            
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`API returned an error: ${response.status} ${response.statusText}`);
+                }
+                const data = await response.json();
+                
+                // --- NEW: Process and filter the results ---
+                const cleanResults = data.results.map(item => ({
+                    product_ndc: item.product_ndc,
+                    labeler_name: item.labeler_name,
+                    brand_name: item.brand_name,
+                    generic_name: item.generic_name,
+                    marketing_start_date: item.marketing_start_date,
+                    listing_expiration_date: item.listing_expiration_date
+                }));
+                // --- END: New processing logic ---
+
+                // Display the CLEANED and formatted JSON results
+                resultsPre.textContent = JSON.stringify(cleanResults, null, 2);
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                errorDiv.textContent = `Error: ${error.message}`;
+                resultsPre.textContent = 'Failed to fetch data.';
+            }
+        });
+    </script>
+</body>
+</html>
