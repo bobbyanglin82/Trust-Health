@@ -60,12 +60,13 @@ function parseManufacturingInfo(labelData) {
         const firstLine = textBlock.split('\n')[0].trim();
         let name = firstLine;
         let country = null;
-        
-        // --- Country Extraction Logic ---
         const upperText = firstLine.toUpperCase();
+
+        // Layer 1: High-confidence check for USA patterns.
         if (/\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\s+\d{5}/.test(upperText) || upperText.includes('USA') || upperText.includes('U.S.A')) {
             country = 'USA';
         } else {
+            // Layer 2: Check against common international countries.
             const commonCountries = ['INDIA', 'IRELAND', 'GERMANY', 'SWITZERLAND', 'JAPAN', 'CHINA', 'KOREA', 'ITALY', 'FRANCE', 'CANADA', 'SPAIN', 'CAYMAN ISLANDS'];
             for (const c of commonCountries) {
                 if (upperText.includes(c)) {
@@ -74,15 +75,19 @@ function parseManufacturingInfo(labelData) {
             }
         }
         
-        // --- Smarter Name Cleaning Logic ---
+        // --- NEW & IMPROVED Name Cleaning Logic ---
         if (country) {
-            // If we found a country, remove it and any address info before it.
             const countryIndex = upperText.lastIndexOf(country.toUpperCase());
+            // Take everything before the country name.
             name = firstLine.substring(0, countryIndex).trim();
         }
-        // General cleanup using comma as a delimiter
+        
+        // Remove trailing address details like ZIP codes that don't have commas.
+        // This specifically targets patterns like "Bachupally - 500 090".
+        name = name.replace(/\s+[\w\s]+\s*-\s*\d+.*$/, '').trim();
+        
+        // Final cleanup with the comma heuristic and punctuation.
         name = name.split(',')[0].trim();
-        // Final cleanup of trailing characters.
         name = name.replace(/[.,;:]\s*$/, '').trim();
 
         return {
@@ -105,7 +110,6 @@ function parseManufacturingInfo(labelData) {
         if (keyRaw.toLowerCase() === 'by' && !/by:/i.test(match[0]) && valueRaw.trim().split(' ').length > 5) {
             continue;
         }
-
         const entityInfo = extractEntityInfo(valueRaw);
         if (!entityInfo.name) continue;
 
