@@ -32,18 +32,14 @@ async function exportRawNdcQueryResults() {
 function parseManufacturingInfo(labelData) {
     const info = {
         manufactured_by: null,
+        manufactured_by_country: null,
         manufactured_for: null,
+        manufactured_for_country: null,
     };
 
-    // 1. Create a single, clean text corpus from a prioritized list of sections.
-    // This focuses the search on the most likely places, improving accuracy.
     const searchSections = [
-        'spl_unclassified_section',
-        'spl_medguide',
-        'information_for_patients',
-        'spl_patient_package_insert',
-        'how_supplied',
-        'package_label_principal_display_panel'
+        'spl_unclassified_section', 'spl_medguide', 'information_for_patients',
+        'spl_patient_package_insert', 'how_supplied', 'package_label_principal_display_panel'
     ];
     let textCorpus = '';
     const seen = new Set();
@@ -52,58 +48,77 @@ function parseManufacturingInfo(labelData) {
             const sectionText = Array.isArray(labelData[key]) ? labelData[key].join('\n') : String(labelData[key]);
             const cleanedText = sectionText.replace(/\u00a0/g, ' ').replace(/\s{2,}/g, ' ').trim();
             if (cleanedText && !seen.has(cleanedText)) {
-                // Use double newlines to represent paragraph breaks, a key for the new regex.
                 textCorpus += cleanedText + '\n\n';
             }
         }
     }
     if (!textCorpus) return info;
 
-    // 2. A more robust cleaning function.
-    const cleanValue = (value) => {
-        if (!value) return null;
-        // Take only the first meaningful line of a captured block.
-        let firstLine = value.split('\n')[0].trim();
-        // Heuristic: take only the part before the first comma to get the company name.
-        let finalValue = firstLine.split(',')[0].trim();
-        // Final cleanup of trailing characters.
-        finalValue = finalValue.replace(/[.,;:]\s*$/, '').trim();
-        return finalValue.length > 2 ? finalValue : null;
-    };
+    const extractEntityInfo = (textBlock) => {
+        if (!textBlock) return { name: null, country: null };
 
-    // 3. Define all possible phrases. The regex will search for these as whole phrases.
+        const firstLine = textBlock.split('\n')[0].trim();
+        let name = firstLine;
+        let country = null;
+        
+        // --- Country Extraction Logic ---
+        const upperText = firstLine.toUpperCase();
+        if (/\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\s+\d{5}/.test(upperText) || upperText.includes('USA') || upperText.includes('U.S.A')) {
+            country = 'USA';
+        } else {
+            const commonCountries = ['INDIA', 'IRELAND', 'GERMANY', 'SWITZERLAND', 'JAPAN', 'CHINA', 'KOREA', 'ITALY', 'FRANCE', 'CANADA', 'SPAIN', 'CAYMAN ISLANDS'];
+            for (const c of commonCountries) {
+                if (upperText.includes(c)) {
+                    country = c.charAt(0).toUpperCase() + c.slice(1).toLowerCase().replace(/_/g, ' ');
+                }
+            }
+        }
+        
+        // --- Smarter Name Cleaning Logic ---
+        if (country) {
+            // If we found a country, remove it and any address info before it.
+            const countryIndex = upperText.lastIndexOf(country.toUpperCase());
+            name = firstLine.substring(0, countryIndex).trim();
+        }
+        // General cleanup using comma as a delimiter
+        name = name.split(',')[0].trim();
+        // Final cleanup of trailing characters.
+        name = name.replace(/[.,;:]\s*$/, '').trim();
+
+        return {
+            name: name.length > 2 ? name : null,
+            country: country
+        };
+    };
+    
     const forPrefixes = ['Manufactured for', 'Mfd\\. for', 'Mfr\\. for'];
     const byPrefixes = ['Manufactured by', 'Mfd\\. by', 'Mfr\\. by', 'Distributed by', 'Marketed by', 'By'];
     const allPrefixes = [...forPrefixes, ...byPrefixes];
     
-    // 4. This is the new Master Regex.
-    // It finds a prefix and captures everything until it sees the next prefix OR a blank line OR the end of the text.
-    const pattern = new RegExp(
-        `\\b(${allPrefixes.join('|')})[:\\s]*([\\s\\S]+?)(?=\\b(?:${allPrefixes.join('|')})|\\n\\s*\\n|$)`,
-        'gi'
-    );
-
-    // 5. Find all matches in the entire document at once.
+    const pattern = new RegExp(`\\b(${allPrefixes.join('|')})[:\\s]*([\\s\\S]+?)(?=\\b(?:${allPrefixes.join('|')})|\\n\\s*\\n|$)`, 'gi');
     const matches = [...textCorpus.matchAll(pattern)];
 
-    // 6. Process the clean, well-defined matches.
     for (const match of matches) {
         const keyRaw = match[1];
         const valueRaw = match[2];
         
-        // This is a special case for "By:" to ensure it's not a common word.
-        // It must have a colon or be the only word on its line.
         if (keyRaw.toLowerCase() === 'by' && !/by:/i.test(match[0]) && valueRaw.trim().split(' ').length > 5) {
             continue;
         }
 
-        const cleaned = cleanValue(valueRaw);
-        if (!cleaned) continue;
+        const entityInfo = extractEntityInfo(valueRaw);
+        if (!entityInfo.name) continue;
 
         if (forPrefixes.some(p => new RegExp(p, 'i').test(keyRaw))) {
-            if (!info.manufactured_for) info.manufactured_for = cleaned;
+            if (!info.manufactured_for) {
+                 info.manufactured_for = entityInfo.name;
+                 info.manufactured_for_country = entityInfo.country;
+            }
         } else {
-            if (!info.manufactured_by) info.manufactured_by = cleaned;
+            if (!info.manufactured_by) {
+                info.manufactured_by = entityInfo.name;
+                info.manufactured_by_country = entityInfo.country;
+            }
         }
     }
     
