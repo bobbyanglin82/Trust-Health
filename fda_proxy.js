@@ -39,16 +39,30 @@ function parseManufacturingInfo(fullText) {
     raw_snippet: null
   };
   const normalizedText = fullText.replace(/\u00a0/g, ' ').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[‐‑‒–—―]/g, '-').replace(/(\r?\n)+/g, '\n').replace(/\s{2,}/g, ' ').trim();
-  const prefixes = ['Manufactured by', 'Mfd. by', 'Mfr. by', 'Manufactured for', 'Mfd. for', 'Mfr. for', 'Distributed by', 'Marketed by', 'Packed by', 'Product of'];
+
+  // --- CHANGE 1: Add 'By' to the list of prefixes. ---
+  const prefixes = ['Manufactured by', 'Mfd. by', 'Mfr. by', 'Manufactured for', 'Mfd. for', 'Mfr. for', 'Distributed by', 'Marketed by', 'Packed by', 'Product of', 'By'];
+  
   const pattern = new RegExp(`\\b(${prefixes.join('|')})[:\\s]*([\\s\\S]+?)(?=\\b(?:${prefixes.join('|')})|$)`, 'gi');
   let match;
+
   while ((match = pattern.exec(normalizedText)) !== null) {
-    const key = match[1].toLowerCase();
-    // --- START: New Refining Logic ---
+    let key = match[1].toLowerCase().trim();
+    // Normalize 'by' to a consistent key for easier logic.
+    if (key === 'by') {
+      key = 'manufactured by';
+    }
+
     let rawBlock = match[2].trim();
 
-    // 1. Stop at common keywords that are not part of a company name.
-    const stopKeywords = ['U.S. License', 'Revised', 'NDC'];
+    // --- CHANGE 2: Expand the list of stop keywords. ---
+    // This will more aggressively trim junk text from the end of a capture.
+    const stopKeywords = [
+        'U.S. License', 'Revised', 'NDC', 'PRINCIPAL DISPLAY PANEL', 
+        'ATTENTION PHARMACIST', 'Rx only', 'Copyright', '©', '®', '™', 
+        'All rights reserved', 'is a registered trademark'
+    ];
+
     for (const keyword of stopKeywords) {
       const index = rawBlock.toUpperCase().indexOf(keyword.toUpperCase());
       if (index !== -1) {
@@ -56,23 +70,30 @@ function parseManufacturingInfo(fullText) {
       }
     }
 
-    // 2. Take only the first line of the remaining text block.
     let value = rawBlock.split('\n')[0].trim();
-
-    // 3. Clean up any trailing punctuation from that first line.
     value = value.replace(/[,.;\s]*$/, '').trim();
-    // --- END: New Refining Logic ---
+
+    // --- CHANGE 3: Implement smarter overwrite logic. ---
+    // This allows a better (more detailed) value to replace a previously found one.
+    const shouldOverwrite = (currentValue, newValue) => {
+        if (!currentValue) return true; // Always fill if empty.
+        // Overwrite if the new value is significantly longer, suggesting more detail.
+        if (newValue.length > currentValue.length + 5) return true; 
+        return false;
+    };
+
     if (key.includes('manufactured by')) {
-      if (!info.manufactured_by) info.manufactured_by = value;
+      if (shouldOverwrite(info.manufactured_by, value)) info.manufactured_by = value;
     } else if (key.includes('manufactured for')) {
-      if (!info.manufactured_for) info.manufactured_for = value;
+      if (shouldOverwrite(info.manufactured_for, value)) info.manufactured_for = value;
     } else if (key.includes('distributed by')) {
-      if (!info.distributed_by) info.distributed_by = value;
+      if (shouldOverwrite(info.distributed_by, value)) info.distributed_by = value;
     } else if (key.includes('marketed by')) {
-      if (!info.marketed_by) info.marketed_by = value;
+      if (shouldOverwrite(info.marketed_by, value)) info.marketed_by = value;
     } else if (key.includes('product of')) {
-      if (!info.product_of) info.product_of = value;
+      if (shouldOverwrite(info.product_of, value)) info.product_of = value;
     }
+    
     if (!info.raw_snippet) info.raw_snippet = match[0];
   }
   return info;
