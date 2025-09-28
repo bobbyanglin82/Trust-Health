@@ -33,97 +33,80 @@ function parseManufacturingInfo(labelData) {
     const info = {
         manufactured_by: null,
         manufactured_for: null,
-        distributed_by: null,
-        marketed_by: null,
     };
 
-    // 1. Search ALL text sections, not a limited list.
+    // 1. Create a single, clean text corpus from a prioritized list of sections.
+    // This focuses the search on the most likely places, improving accuracy.
+    const searchSections = [
+        'spl_unclassified_section',
+        'spl_medguide',
+        'information_for_patients',
+        'spl_patient_package_insert',
+        'how_supplied',
+        'package_label_principal_display_panel'
+    ];
     let textCorpus = '';
     const seen = new Set();
-    for (const key in labelData) {
+    for (const key of searchSections) {
         if (Object.prototype.hasOwnProperty.call(labelData, key) && labelData[key]) {
-            // Only process keys that contain string data
-            if (key.includes('text') || Array.isArray(labelData[key])) {
-                const sectionText = Array.isArray(labelData[key]) ? labelData[key].join('\n') : String(labelData[key]);
-                const cleanedText = sectionText.replace(/\u00a0/g, ' ').replace(/\s{2,}/g, ' ').trim();
-                if (cleanedText && !seen.has(cleanedText)) {
-                    textCorpus += cleanedText + '\n';
-                    seen.add(cleanedText);
-                }
+            const sectionText = Array.isArray(labelData[key]) ? labelData[key].join('\n') : String(labelData[key]);
+            const cleanedText = sectionText.replace(/\u00a0/g, ' ').replace(/\s{2,}/g, ' ').trim();
+            if (cleanedText && !seen.has(cleanedText)) {
+                // Use double newlines to represent paragraph breaks, a key for the new regex.
+                textCorpus += cleanedText + '\n\n';
             }
         }
     }
     if (!textCorpus) return info;
 
-    const lines = textCorpus.split(/\r?\n/);
-
-    // 2. Refined cleaning function
+    // 2. A more robust cleaning function.
     const cleanValue = (value) => {
         if (!value) return null;
-        let cleaned = value.trim();
-
-        const stopPatterns = [
-            /U\.S\. License/i, /US License/i, /Revised:/i, /NDC /i,
-            /PRINCIPAL DISPLAY PANEL/i, /ATTENTION PHARMACIST/i, /Rx only/i,
-            /Copyright ©/i, /©/i, /®/i, /™/i, /All rights reserved/i,
-            /is a registered trademark/i, /is a trademark/i
-        ];
-        
-        stopPatterns.forEach(pattern => {
-            const match = cleaned.match(pattern);
-            if (match && match.index > 0) {
-                cleaned = cleaned.substring(0, match.index);
-            }
-        });
-        
-        let finalValue = cleaned.split(',')[0].trim();
+        // Take only the first meaningful line of a captured block.
+        let firstLine = value.split('\n')[0].trim();
+        // Heuristic: take only the part before the first comma to get the company name.
+        let finalValue = firstLine.split(',')[0].trim();
+        // Final cleanup of trailing characters.
         finalValue = finalValue.replace(/[.,;:]\s*$/, '').trim();
-
         return finalValue.length > 2 ? finalValue : null;
     };
+
+    // 3. Define all possible phrases. The regex will search for these as whole phrases.
+    const forPrefixes = ['Manufactured for', 'Mfd\\. for', 'Mfr\\. for'];
+    const byPrefixes = ['Manufactured by', 'Mfd\\. by', 'Mfr\\. by', 'Distributed by', 'Marketed by', 'By'];
+    const allPrefixes = [...forPrefixes, ...byPrefixes];
     
-    // 3. Un-anchored ("contains") patterns that capture the rest of the line (.*)
-    const patterns = {
-        manufactured_for: /(?:Manufactured for|Mfd\. for|Mfr\. for):\s*(.*)/i,
-        manufactured_by: /(?:Manufactured by|Mfd\. by|Mfr\. by):\s*(.+)|By:\s*(.*)/i,
-        distributed_by: /Distributed by:\s*(.*)/i,
-        marketed_by: /Marketed by:\s*(.*)/i,
-    };
+    // 4. This is the new Master Regex.
+    // It finds a prefix and captures everything until it sees the next prefix OR a blank line OR the end of the text.
+    const pattern = new RegExp(
+        `\\b(${allPrefixes.join('|')})[:\\s]*([\\s\\S]+?)(?=\\b(?:${allPrefixes.join('|')})|\\n\\s*\\n|$)`,
+        'gi'
+    );
 
-    // 4. Iterate line-by-line to find and process info
-    for (const line of lines) {
+    // 5. Find all matches in the entire document at once.
+    const matches = [...textCorpus.matchAll(pattern)];
 
-        // High-confidence pattern for "Manufactured for... By..." on the same line
-        if (/(?:Manufactured for|Mfd\. for)/i.test(line) && /\bBy:/i.test(line)) {
-            let forMatch = line.match(/(?:Manufactured for|Mfd\. for)[:\s]*(.+?)\s+By:/i);
-            let byMatch = line.match(/By[:\s]*(.*)/i);
-            
-            if (forMatch && forMatch[1] && !info.manufactured_for) {
-                info.manufactured_for = cleanValue(forMatch[1]);
-            }
-            if (byMatch && byMatch[1] && !info.manufactured_by) {
-                info.manufactured_by = cleanValue(byMatch[1]);
-            }
+    // 6. Process the clean, well-defined matches.
+    for (const match of matches) {
+        const keyRaw = match[1];
+        const valueRaw = match[2];
+        
+        // This is a special case for "By:" to ensure it's not a common word.
+        // It must have a colon or be the only word on its line.
+        if (keyRaw.toLowerCase() === 'by' && !/by:/i.test(match[0]) && valueRaw.trim().split(' ').length > 5) {
             continue;
         }
 
-        // General patterns for all other cases
-        for (const [key, pattern] of Object.entries(patterns)) {
-            if (info[key]) continue;
-    
-            const match = line.match(pattern);
-            if (match) {
-                // Correctly checks both possible capture groups from the regex.
-                const value = match[1] || match[2] || null;
-                if (value) {
-                    const cleaned = cleanValue(value);
-                    if (cleaned) {
-                        info[key] = cleaned;
-                    }
-                }
-            }
+        const cleaned = cleanValue(valueRaw);
+        if (!cleaned) continue;
+
+        if (forPrefixes.some(p => new RegExp(p, 'i').test(keyRaw))) {
+            if (!info.manufactured_for) info.manufactured_for = cleaned;
+        } else {
+            if (!info.manufactured_by) info.manufactured_by = cleaned;
         }
     }
+    
     return info;
 }
 
