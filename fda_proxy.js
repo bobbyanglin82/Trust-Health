@@ -84,10 +84,10 @@ function parseManufacturingInfo(labelData) {
     
     // 3. Un-anchored ("contains") patterns that capture the rest of the line (.*)
     const patterns = {
-        manufactured_for: /(?:Manufactured for|Mfd\. for|Mfr\. for)[:\s]*(.*)/i,
-        manufactured_by: /(?:Manufactured by|Mfd\. by|Mfr\. by|By)[:\s]*(.*)/i,
-        distributed_by: /Distributed by[:\s]*(.*)/i,
-        marketed_by: /Marketed by[:\s]*(.*)/i,
+        manufactured_for: /(?:Manufactured for|Mfd\. for|Mfr\. for):\s*(.*)/i,
+        manufactured_by: /(?:Manufactured by|Mfd\. by|Mfr\. by):\s*(.+)|By:\s*(.*)/i,
+        distributed_by: /Distributed by:\s*(.*)/i,
+        marketed_by: /Marketed by:\s*(.*)/i,
     };
 
     // 4. Iterate line-by-line to find and process info
@@ -110,12 +110,16 @@ function parseManufacturingInfo(labelData) {
         // General patterns for all other cases
         for (const [key, pattern] of Object.entries(patterns)) {
             if (info[key]) continue;
-            
+    
             const match = line.match(pattern);
-            if (match && match[1]) {
-                const cleaned = cleanValue(match[1]);
-                if (cleaned) {
-                    info[key] = cleaned;
+            if (match) {
+                // Correctly checks both possible capture groups from the regex.
+                const value = match[1] || match[2] || null;
+                if (value) {
+                    const cleaned = cleanValue(value);
+                    if (cleaned) {
+                        info[key] = cleaned;
+                    }
                 }
             }
         }
