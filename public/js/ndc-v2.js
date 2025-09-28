@@ -49,7 +49,7 @@ function renderTable(data) {
       item.brand_name || 'N/A',
       item.generic_name || 'N/A',
       formatDate(item.marketing_start_date),
-      formatDate(item.marketing_end_date),
+      formatDate(item.listing_expiration_date),
       item.manufacturer_name || 'N/A',  // CORRECTED: Reads dynamically
       item.manufactured_for || 'N/A'    // CORRECTED: Reads dynamically
     ];
