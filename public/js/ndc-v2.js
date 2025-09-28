@@ -88,3 +88,78 @@ if (searchBox) {
 
 // Initial data fetch
 fetchData();
+
+// --- START: NEW DOWNLOAD FUNCTIONALITY ---
+const downloadBtn = document.getElementById('downloadBtn');
+
+if (downloadBtn) {
+  downloadBtn.addEventListener('click', () => {
+    // 1. Determine which data to download (currently filtered or all)
+    const query = searchBox.value.toLowerCase();
+    let dataToExport = allData; // Default to all data
+
+    if (query && allData) {
+      // If there's a search query, filter the data just like the search box does
+      dataToExport = allData.filter(item => {
+        const brandName = (item.brand_name || '').toLowerCase();
+        const genericName = (item.generic_name || '').toLowerCase();
+        const labeler = (item.labeler_name || '').toLowerCase();
+        const productNdc = (item.product_ndc || '').toLowerCase();
+        return brandName.includes(query) || genericName.includes(query) || labeler.includes(query) || productNdc.includes(query);
+      });
+    }
+    
+    if (dataToExport.length === 0) {
+      alert("No data to download.");
+      return;
+    }
+
+    // 2. Convert the data array to a CSV formatted string
+    const headers = [
+      "Product NDC", "Labeler Name", "Proprietary Name (Brand Name)", 
+      "Non-Proprietary Name (Generic Name)", "Start Marketing Date", "End Marketing Date",
+      "Manufactured By", "Manufactured By Country", "Manufactured For"
+    ];
+
+    // Helper function to handle commas and quotes within data cells
+    const escapeCsvCell = (cell) => {
+      const cellStr = String(cell || '');
+      if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+        return `"${cellStr.replace(/"/g, '""')}"`;
+      }
+      return cellStr;
+    };
+
+    const csvRows = [headers.join(',')]; // Start with the header row
+    dataToExport.forEach(item => {
+      const row = [
+        item.product_ndc,
+        item.labeler_name,
+        item.brand_name,
+        item.generic_name,
+        item.marketing_start_date,
+        item.listing_expiration_date,
+        item.manufacturer_name,
+        item.manufacturer_by_country, // The new country column
+        item.manufactured_for
+      ].map(escapeCsvCell);
+      csvRows.push(row.join(','));
+    });
+
+    const csvContent = csvRows.join('\n');
+
+    // 3. Create a temporary link to trigger the browser's download functionality
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'ndc_data_export.csv');
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
+// --- END: NEW DOWNLOAD FUNCTIONALITY ---
