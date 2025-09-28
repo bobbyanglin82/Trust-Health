@@ -37,25 +37,19 @@ function parseManufacturingInfo(labelData) {
         marketed_by: null,
     };
 
-    // 1. Define a prioritized list of sections to scan for information.
-    const prioritizedSections = [
-        'spl_unclassified_section',
-        'information_for_patients',
-        'spl_patient_package_insert',
-        'how_supplied',
-        'package_label_principal_display_panel'
-    ];
-
-    // 2. Aggregate all text from the relevant sections into one corpus.
+    // 1. Search ALL text sections, not a limited list.
     let textCorpus = '';
     const seen = new Set();
-    for (const key of prioritizedSections) {
+    for (const key in labelData) {
         if (Object.prototype.hasOwnProperty.call(labelData, key) && labelData[key]) {
-            const sectionText = Array.isArray(labelData[key]) ? labelData[key].join('\n') : String(labelData[key]);
-            const cleanedText = sectionText.replace(/\u00a0/g, ' ').replace(/\s{2,}/g, ' ').trim();
-            if (cleanedText && !seen.has(cleanedText)) {
-                textCorpus += cleanedText + '\n';
-                seen.add(cleanedText);
+            // Only process keys that contain string data
+            if (key.includes('text') || Array.isArray(labelData[key])) {
+                const sectionText = Array.isArray(labelData[key]) ? labelData[key].join('\n') : String(labelData[key]);
+                const cleanedText = sectionText.replace(/\u00a0/g, ' ').replace(/\s{2,}/g, ' ').trim();
+                if (cleanedText && !seen.has(cleanedText)) {
+                    textCorpus += cleanedText + '\n';
+                    seen.add(cleanedText);
+                }
             }
         }
     }
@@ -63,12 +57,11 @@ function parseManufacturingInfo(labelData) {
 
     const lines = textCorpus.split(/\r?\n/);
 
-    // 3. Helper function to aggressively clean the extracted value.
+    // 2. Refined cleaning function
     const cleanValue = (value) => {
         if (!value) return null;
         let cleaned = value.trim();
 
-        // Define patterns that signal the end of a company name.
         const stopPatterns = [
             /U\.S\. License/i, /US License/i, /Revised:/i, /NDC /i,
             /PRINCIPAL DISPLAY PANEL/i, /ATTENTION PHARMACIST/i, /Rx only/i,
@@ -82,23 +75,28 @@ function parseManufacturingInfo(labelData) {
                 cleaned = cleaned.substring(0, match.index);
             }
         });
-
-        // Heuristic: take the most significant part before address details.
-        // This handles "Company Name, Street, City" by grabbing "Company Name".
+        
         let finalValue = cleaned.split(',')[0].trim();
-        finalValue = finalValue.replace(/[.,;:]\s*$/, '').trim(); // Remove trailing punctuation
+        finalValue = finalValue.replace(/[.,;:]\s*$/, '').trim();
 
-        return finalValue.length > 2 ? finalValue : null; // Ensure we have a meaningful name.
+        return finalValue.length > 2 ? finalValue : null;
     };
     
-    // 4. Iterate through each line to find and process manufacturing information.
-    for (let i = 0; i < lines.length; i++) {
-        let line = lines[i];
+    // 3. Un-anchored ("contains") patterns that capture the rest of the line (.*)
+    const patterns = {
+        manufactured_for: /(?:Manufactured for|Mfd\. for|Mfr\. for)[:\s]*(.*)/i,
+        manufactured_by: /(?:Manufactured by|Mfd\. by|Mfr\. by|By)[:\s]*(.*)/i,
+        distributed_by: /Distributed by[:\s]*(.*)/i,
+        marketed_by: /Marketed by[:\s]*(.*)/i,
+    };
 
-        // A. Special high-confidence pattern: "Manufactured for... By..."
-        if (/Manufactured for/i.test(line) && /\bBy:/i.test(line)) {
-            let forMatch = line.match(/Manufactured for[:\s]*(.+?)\s+By:/i);
-            let byMatch = line.match(/By[:\s]*(.+)/i);
+    // 4. Iterate line-by-line to find and process info
+    for (const line of lines) {
+
+        // High-confidence pattern for "Manufactured for... By..." on the same line
+        if (/(?:Manufactured for|Mfd\. for)/i.test(line) && /\bBy:/i.test(line)) {
+            let forMatch = line.match(/(?:Manufactured for|Mfd\. for)[:\s]*(.+?)\s+By:/i);
+            let byMatch = line.match(/By[:\s]*(.*)/i);
             
             if (forMatch && forMatch[1] && !info.manufactured_for) {
                 info.manufactured_for = cleanValue(forMatch[1]);
@@ -106,21 +104,15 @@ function parseManufacturingInfo(labelData) {
             if (byMatch && byMatch[1] && !info.manufactured_by) {
                 info.manufactured_by = cleanValue(byMatch[1]);
             }
-            continue; // Move to the next line once handled.
+            continue;
         }
 
-        // B. General patterns for all other cases.
-        const patterns = {
-            manufactured_for: /Manufactured for[:\s]*(.+)/i,
-            manufactured_by: /(?:Manufactured|Mfd\.)\s+by[:\s]*(.+)/i,
-            distributed_by: /Distributed by[:\s]*(.+)/i,
-            marketed_by: /Marketed by[:\s]*(.+)/i,
-        };
-
+        // General patterns for all other cases
         for (const [key, pattern] of Object.entries(patterns)) {
+            if (info[key]) continue;
+            
             const match = line.match(pattern);
-            if (match && match[1] && !info[key]) {
-                // If a value is found, clean it and assign it.
+            if (match && match[1]) {
                 const cleaned = cleanValue(match[1]);
                 if (cleaned) {
                     info[key] = cleaned;
@@ -128,7 +120,6 @@ function parseManufacturingInfo(labelData) {
             }
         }
     }
-
     return info;
 }
 
