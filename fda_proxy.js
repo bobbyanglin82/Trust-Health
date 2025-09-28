@@ -186,6 +186,7 @@ async function downloadData() {
         marketing_start_date: ndcData.marketing_start_date || labelData.effective_time || 'N/A',
         listing_expiration_date: ndcData.listing_expiration_date || 'N/A',
         manufacturer_name: manufacturingInfo.manufactured_by || 'N/A (Not Found on Label)',
+        manufacturer_by_country: manufacturingInfo.manufactured_by_country || 'N/A',
         manufactured_for: manufacturingInfo.manufactured_for || ndcData.labeler_name || 'N/A'
       });
     }
