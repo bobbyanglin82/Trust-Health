@@ -29,74 +29,107 @@ async function exportRawNdcQueryResults() {
 }
 // --- END: Raw NDC Query Export Function ---
 
-function parseManufacturingInfo(fullText) {
-  const info = {
-    manufactured_by: null,
-    manufactured_for: null,
-    distributed_by: null,
-    marketed_by: null,
-    product_of: null,
-    raw_snippet: null
-  };
-  const normalizedText = fullText.replace(/\u00a0/g, ' ').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[‐‑‒–—―]/g, '-').replace(/(\r?\n)+/g, '\n').replace(/\s{2,}/g, ' ').trim();
-
-  // --- CHANGE 1: Add 'By' to the list of prefixes. ---
-  const prefixes = ['Manufactured by', 'Mfd. by', 'Mfr. by', 'Manufactured for', 'Mfd. for', 'Mfr. for', 'Distributed by', 'Marketed by', 'Packed by', 'Product of', 'By'];
-  
-  const pattern = new RegExp(`\\b(${prefixes.join('|')})[:\\s]*([\\s\\S]+?)(?=\\b(?:${prefixes.join('|')})|$)`, 'gi');
-  let match;
-
-  while ((match = pattern.exec(normalizedText)) !== null) {
-    let key = match[1].toLowerCase().trim();
-    // Normalize 'by' to a consistent key for easier logic.
-    if (key === 'by') {
-      key = 'manufactured by';
-    }
-
-    let rawBlock = match[2].trim();
-
-    // --- CHANGE 2: Expand the list of stop keywords. ---
-    // This will more aggressively trim junk text from the end of a capture.
-    const stopKeywords = [
-        'U.S. License', 'Revised', 'NDC', 'PRINCIPAL DISPLAY PANEL', 
-        'ATTENTION PHARMACIST', 'Rx only', 'Copyright', '©', '®', '™', 
-        'All rights reserved', 'is a registered trademark'
-    ];
-
-    for (const keyword of stopKeywords) {
-      const index = rawBlock.toUpperCase().indexOf(keyword.toUpperCase());
-      if (index !== -1) {
-        rawBlock = rawBlock.substring(0, index).trim();
-      }
-    }
-
-    let value = rawBlock.split('\n')[0].trim();
-    value = value.replace(/[,.;\s]*$/, '').trim();
-
-    // --- CHANGE 3: Implement smarter overwrite logic. ---
-    // This allows a better (more detailed) value to replace a previously found one.
-    const shouldOverwrite = (currentValue, newValue) => {
-        if (!currentValue) return true; // Always fill if empty.
-        // Overwrite if the new value is significantly longer, suggesting more detail.
-        if (newValue.length > currentValue.length + 5) return true; 
-        return false;
+function parseManufacturingInfo(labelData) {
+    const info = {
+        manufactured_by: null,
+        manufactured_for: null,
+        distributed_by: null,
+        marketed_by: null,
     };
 
-    if (key.includes('manufactured by')) {
-      if (shouldOverwrite(info.manufactured_by, value)) info.manufactured_by = value;
-    } else if (key.includes('manufactured for')) {
-      if (shouldOverwrite(info.manufactured_for, value)) info.manufactured_for = value;
-    } else if (key.includes('distributed by')) {
-      if (shouldOverwrite(info.distributed_by, value)) info.distributed_by = value;
-    } else if (key.includes('marketed by')) {
-      if (shouldOverwrite(info.marketed_by, value)) info.marketed_by = value;
-    } else if (key.includes('product of')) {
-      if (shouldOverwrite(info.product_of, value)) info.product_of = value;
+    // 1. Define a prioritized list of sections to scan for information.
+    const prioritizedSections = [
+        'spl_unclassified_section',
+        'information_for_patients',
+        'spl_patient_package_insert',
+        'how_supplied',
+        'package_label_principal_display_panel'
+    ];
+
+    // 2. Aggregate all text from the relevant sections into one corpus.
+    let textCorpus = '';
+    const seen = new Set();
+    for (const key of prioritizedSections) {
+        if (Object.prototype.hasOwnProperty.call(labelData, key) && labelData[key]) {
+            const sectionText = Array.isArray(labelData[key]) ? labelData[key].join('\n') : String(labelData[key]);
+            const cleanedText = sectionText.replace(/\u00a0/g, ' ').replace(/\s{2,}/g, ' ').trim();
+            if (cleanedText && !seen.has(cleanedText)) {
+                textCorpus += cleanedText + '\n';
+                seen.add(cleanedText);
+            }
+        }
     }
+    if (!textCorpus) return info;
+
+    const lines = textCorpus.split(/\r?\n/);
+
+    // 3. Helper function to aggressively clean the extracted value.
+    const cleanValue = (value) => {
+        if (!value) return null;
+        let cleaned = value.trim();
+
+        // Define patterns that signal the end of a company name.
+        const stopPatterns = [
+            /U\.S\. License/i, /US License/i, /Revised:/i, /NDC /i,
+            /PRINCIPAL DISPLAY PANEL/i, /ATTENTION PHARMACIST/i, /Rx only/i,
+            /Copyright ©/i, /©/i, /®/i, /™/i, /All rights reserved/i,
+            /is a registered trademark/i, /is a trademark/i
+        ];
+        
+        stopPatterns.forEach(pattern => {
+            const match = cleaned.match(pattern);
+            if (match && match.index > 0) {
+                cleaned = cleaned.substring(0, match.index);
+            }
+        });
+
+        // Heuristic: take the most significant part before address details.
+        // This handles "Company Name, Street, City" by grabbing "Company Name".
+        let finalValue = cleaned.split(',')[0].trim();
+        finalValue = finalValue.replace(/[.,;:]\s*$/, '').trim(); // Remove trailing punctuation
+
+        return finalValue.length > 2 ? finalValue : null; // Ensure we have a meaningful name.
+    };
     
-    if (!info.raw_snippet) info.raw_snippet = match[0];
-  }
-  return info;
+    // 4. Iterate through each line to find and process manufacturing information.
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        // A. Special high-confidence pattern: "Manufactured for... By..."
+        if (/Manufactured for/i.test(line) && /\bBy:/i.test(line)) {
+            let forMatch = line.match(/Manufactured for[:\s]*(.+?)\s+By:/i);
+            let byMatch = line.match(/By[:\s]*(.+)/i);
+            
+            if (forMatch && forMatch[1] && !info.manufactured_for) {
+                info.manufactured_for = cleanValue(forMatch[1]);
+            }
+            if (byMatch && byMatch[1] && !info.manufactured_by) {
+                info.manufactured_by = cleanValue(byMatch[1]);
+            }
+            continue; // Move to the next line once handled.
+        }
+
+        // B. General patterns for all other cases.
+        const patterns = {
+            manufactured_for: /Manufactured for[:\s]*(.+)/i,
+            manufactured_by: /(?:Manufactured|Mfd\.)\s+by[:\s]*(.+)/i,
+            distributed_by: /Distributed by[:\s]*(.+)/i,
+            marketed_by: /Marketed by[:\s]*(.+)/i,
+        };
+
+        for (const [key, pattern] of Object.entries(patterns)) {
+            const match = line.match(pattern);
+            if (match && match[1] && !info[key]) {
+                // If a value is found, clean it and assign it.
+                const cleaned = cleanValue(match[1]);
+                if (cleaned) {
+                    info[key] = cleaned;
+                }
+            }
+        }
+    }
+
+    return info;
 }
 
 async function downloadData() {
@@ -162,7 +195,7 @@ async function downloadData() {
         return chunks.join('\n\n');
       })();
       
-      const manufacturingInfo = parseManufacturingInfo(textCorpus);
+      const manufacturingInfo = parseManufacturingInfo(labelData);
       const product_ndc = labelData.openfda?.product_ndc?.[0] || 'N/A';
       const ndcData = ndcDataMap.get(product_ndc) || {};
       
