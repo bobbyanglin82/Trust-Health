@@ -127,7 +127,7 @@ async function buildFromAllPartitions() {
                         if (manufacturingInfo.manufactured_by_country && manufacturingInfo.manufactured_by_country.toUpperCase() !== 'USA') {
                             const openfda = labelData.openfda || {};
                             finalResults.push({
-                                product_ndc: labelData.set_id?.[0] || openfda.product_ndc?.[0] || 'N/A',
+                                product_ndc: openfda.product_ndc?.[0] || 'N/A',
                                 labeler_name: openfda.manufacturer_name?.[0] || 'N/A',
                                 brand_name: openfda.brand_name?.[0] || 'N/A',
                                 generic_name: openfda.generic_name?.[0] || 'N/A',
