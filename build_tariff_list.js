@@ -1,15 +1,24 @@
-// NEW FILE: build_tariff_list.js
-
+// FINAL SCRIPT: build_tariff_list.js (Processes All Partitions)
+//
+// This script downloads ALL partitions of the OpenFDA drug label bulk data,
+// processes each one as a stream, and combines them into one final, comprehensive file.
+//
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const JSONStream = require('JSONStream');
+const unzipper = require('unzipper');
 
-/**
- * This is the same successful parser from your fda_proxy.js file.
- * It's included here to make this script fully self-contained.
- */
+// --- START: Reused "Unpacker" and "Text Analyzer" Logic ---
+// This is the original, successful parser from your fda_proxy.js.
 function parseManufacturingInfo(labelData) {
-    const info = { manufactured_by: null, manufactured_by_country: null, manufactured_for: null, manufactured_for_country: null };
+    const info = {
+        manufactured_by: null,
+        manufactured_by_country: null,
+        manufactured_for: null,
+        manufactured_for_country: null,
+    };
+
     const searchSections = [
         'spl_unclassified_section', 'spl_medguide', 'information_for_patients',
         'spl_patient_package_insert', 'how_supplied', 'package_label_principal_display_panel'
@@ -33,6 +42,7 @@ function parseManufacturingInfo(labelData) {
         let name = firstLine;
         let country = null;
         const upperText = firstLine.toUpperCase();
+
         if (/\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\s+\d{5}/.test(upperText) || upperText.includes('USA') || upperText.includes('U.S.A')) {
             country = 'USA';
         } else {
@@ -43,19 +53,23 @@ function parseManufacturingInfo(labelData) {
                 }
             }
         }
+        
         if (country) {
             const countryIndex = upperText.lastIndexOf(country.toUpperCase());
             name = firstLine.substring(0, countryIndex).trim();
         }
+        
         name = name.replace(/\s+[\w\s]+\s*-\s*\d+.*$/, '').trim();
         name = name.split(',')[0].trim();
         name = name.replace(/[.,;:]\s*$/, '').trim();
+
         return { name: name.length > 2 ? name : null, country: country };
     };
     
     const forPrefixes = ['Manufactured for', 'Mfd\\. for', 'Mfr\\. for'];
     const byPrefixes = ['Manufactured by', 'Mfd\\. by', 'Mfr\\. by', 'Distributed by', 'Marketed by', 'By'];
     const allPrefixes = [...forPrefixes, ...byPrefixes];
+    
     const pattern = new RegExp(`\\b(${allPrefixes.join('|')})[:\\s]*([\\s\\S]+?)(?=\\b(?:${allPrefixes.join('|')})|\\n\\s*\\n|$)`, 'gi');
     const matches = [...textCorpus.matchAll(pattern)];
     for (const match of matches) {
@@ -72,124 +86,85 @@ function parseManufacturingInfo(labelData) {
     }
     return info;
 }
+// --- END: Reused "Unpacker" and "Text Analyzer" Logic ---
 
-/**
- * The main function to build the tariff data file.
- */
-async function buildTariffList() {
-    console.log('--- Starting Tariff Scope Build Process ---');
-    
-    // Define the output path for the final JSON file. It will be saved in the `public` directory.
+
+async function buildFromAllPartitions() {
+    console.log('--- Starting COMPLETE Bulk Build Process (All Partitions) ---');
     const outputPath = path.join(__dirname, 'public', 'tariff-data.json');
-    
-    // --- Phase 1: Fetch all drug labels from the API with pagination ---
-    const allLabelResults = [];
-    let skip = 0;
-    const limit = 1000;
-    const maxPages = 26; // OpenFDA's practical limit is ~26,000 records via 'skip'
-    const searchQuery = '_exists_:openfda.brand_name+OR+_exists_:openfda.generic_name';
+    const finalResults = []; // This will hold results from ALL partitions
+    let totalProcessedCount = 0;
 
-    console.log('Phase 1: Fetching all drug labels...');
-    for (let page = 0; page < maxPages; page++) {
-        process.stdout.write(`   - Fetching page ${page + 1}/${maxPages}...\r`);
-        try {
-            const labelApiUrl = `https://api.fda.gov/drug/label.json?search=${searchQuery}&limit=${limit}&skip=${skip}`;
-            const labelResponse = await axios.get(labelApiUrl);
-            
-            if (!labelResponse.data.results || labelResponse.data.results.length === 0) {
-                console.log('\n   No more results found. Ending fetch loop.');
-                break;
-            }
-            
-            allLabelResults.push(...labelResponse.data.results);
-            
-            if (labelResponse.data.results.length < limit) {
-                console.log('\n   Last page reached. Ending fetch loop.');
-                break;
-            }
-            
-            skip += limit;
-        } catch (error) {
-            console.error(`\n❌ Error on page ${page + 1}: ${error.message}. Stopping.`);
-            break;
-        }
-    }
-    console.log(`\n✅ Phase 1 Complete. Total records fetched: ${allLabelResults.length}.`);
-
-    if (allLabelResults.length === 0) {
-        console.log('No records found. Exiting.');
-        return;
-    }
-
-    // --- Phase 2: Enrich the data with details from the NDC API ---
-    // This part is memory intensive. For very large datasets, a streaming approach would be better.
-    console.log('Phase 2: Enriching with NDC data...');
-    const ndcDataMap = new Map();
-    const allNdcs = allLabelResults.map(l => l.openfda?.product_ndc?.[0]).filter(Boolean);
-    
-    // The NDC API query can also be long, so we do it in batches.
-    const batchSize = 250; // A safe batch size to avoid overly long URLs
-    for (let i = 0; i < allNdcs.length; i += batchSize) {
-        const batch = allNdcs.slice(i, i + batchSize);
-        process.stdout.write(`   - Enriching batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(allNdcs.length/batchSize)}...\r`);
-        const ndcSearchQuery = batch.map(ndc => `product_ndc:"${ndc}"`).join('+OR+');
-        const ndcApiUrl = `https://api.fda.gov/drug/ndc.json?search=${ndcSearchQuery}&limit=${batch.length}`;
-        try {
-            const ndcResponse = await axios.get(ndcApiUrl);
-            if (ndcResponse.data.results) {
-                ndcResponse.data.results.forEach(product => {
-                    ndcDataMap.set(product.product_ndc, {
-                        marketing_start_date: product.marketing_start_date,
-                        listing_expiration_date: product.listing_expiration_date,
-                        labeler_name: product.labeler_name,
-                        brand_name: product.brand_name,
-                        generic_name: product.generic_name
-                    });
-                });
-            }
-        } catch (error) {
-             console.error(`\n❌ Error enriching NDC batch: ${error.message}`);
-        }
-    }
-    console.log(`\n✅ Phase 2 Complete. Enriched ${ndcDataMap.size} unique NDCs.`);
-
-    // --- Phase 3: Parse, Filter, and Assemble the Final Results ---
-    console.log('Phase 3: Parsing manufacturing info and filtering for non-USA products...');
-    const finalResults = [];
-    for (const labelData of allLabelResults) {
-        if (!labelData) continue;
-        const manufacturingInfo = parseManufacturingInfo(labelData);
-
-        // This is our key filter: only include products manufactured outside the USA.
-        if (manufacturingInfo.manufactured_by_country && manufacturingInfo.manufactured_by_country.toUpperCase() !== 'USA') {
-            const product_ndc = labelData.openfda?.product_ndc?.[0] || 'N/A';
-            const ndcData = ndcDataMap.get(product_ndc) || {};
-            finalResults.push({
-                product_ndc: product_ndc,
-                labeler_name: ndcData.labeler_name || 'N/A',
-                brand_name: ndcData.brand_name || 'N/A',
-                generic_name: ndcData.generic_name || 'N/A',
-                marketing_start_date: ndcData.marketing_start_date || labelData.effective_time || 'N/A',
-                listing_expiration_date: ndcData.listing_expiration_date || 'N/A',
-                manufacturer_name: manufacturingInfo.manufactured_by || 'N/A (Not Found)',
-                manufacturer_by_country: manufacturingInfo.manufactured_by_country,
-                manufactured_for: manufacturingInfo.manufactured_for || ndcData.labeler_name || 'N/A'
-            });
-        }
-    }
-    console.log(`✅ Phase 3 Complete. Found ${finalResults.length} non-USA manufactured products.`);
-
-    // --- Phase 4: Write the Final File ---
-    console.log(`Phase 4: Writing final data to ${outputPath}...`);
     try {
-        // Ensure the 'public' directory exists
-        fs.mkdirSync(path.join(__dirname, 'public'), { recursive: true });
+        // --- Phase 1: Get the list of all download URLs from the manifest ---
+        console.log('Phase 1: Fetching download manifest from api.fda.gov...');
+        const manifestUrl = 'https://api.fda.gov/download.json';
+        const manifestResponse = await axios.get(manifestUrl);
+        const partitions = manifestResponse.data.results.drug.label.partitions;
+        console.log(`✅ Found ${partitions.length} data partitions to process.`);
+
+        // --- Phase 2: Loop through each partition and process it ---
+        let partitionCount = 0;
+        for (const partition of partitions) {
+            partitionCount++;
+            console.log(`\n--- Processing Partition ${partitionCount} of ${partitions.length}: ${partition.file} ---`);
+            
+            let partitionProcessedCount = 0;
+            const response = await axios({ method: 'get', url: partition.file, responseType: 'stream' });
+            
+            const streamProcessing = new Promise((resolve, reject) => {
+                response.data
+                    .pipe(unzipper.ParseOne())
+                    .pipe(JSONStream.parse('results.*'))
+                    .on('data', (labelData) => {
+                        partitionProcessedCount++;
+                        if (partitionProcessedCount % 5000 === 0) {
+                            process.stdout.write(`   - Processed ${partitionProcessedCount} records in this partition...\r`);
+                        }
+
+                        const manufacturingInfo = parseManufacturingInfo(labelData);
+
+                        if (manufacturingInfo.manufactured_by_country && manufacturingInfo.manufactured_by_country.toUpperCase() !== 'USA') {
+                            const openfda = labelData.openfda || {};
+                            finalResults.push({
+                                product_ndc: openfda.product_ndc?.[0] || 'N/A',
+                                labeler_name: openfda.manufacturer_name?.[0] || 'N/A',
+                                brand_name: openfda.brand_name?.[0] || 'N/A',
+                                generic_name: openfda.generic_name?.[0] || 'N/A',
+                                marketing_start_date: labelData.effective_time || 'N/A',
+                                listing_expiration_date: 'N/A',
+                                manufacturer_name: manufacturingInfo.manufactured_by || 'N/A (Not Found)',
+                                manufacturer_by_country: manufacturingInfo.manufactured_by_country,
+                                manufactured_for: manufacturingInfo.manufactured_for || openfda.manufacturer_name?.[0] || 'N/A'
+                            });
+                        }
+                    })
+                    .on('end', () => {
+                        totalProcessedCount += partitionProcessedCount;
+                        console.log(`\nStream for partition ${partitionCount} finished. Processed ${partitionProcessedCount} records.`);
+                        resolve();
+                    })
+                    .on('error', (err) => {
+                        console.error(`\n❌ Error processing partition ${partitionCount}:`, err);
+                        reject(err);
+                    });
+            });
+
+            await streamProcessing; // Wait for the current partition to finish before starting the next
+        }
+
+        console.log(`\n✅ Phase 2 Complete. Total records processed across all partitions: ${totalProcessedCount}.`);
+        console.log(`Found a grand total of ${finalResults.length} non-USA manufactured products.`);
+
+        // --- Phase 3: Write the Final Combined File ---
+        console.log(`Phase 3: Writing final combined data to ${outputPath}...`);
         fs.writeFileSync(outputPath, JSON.stringify(finalResults, null, 2));
-        console.log('✅ --- Build Process Finished Successfully! ---');
+        console.log('✅ --- COMPLETE Bulk Build Process Finished Successfully! ---');
+
     } catch (error) {
-        console.error(`❌ Error writing final file: ${error.message}`);
+        console.error(`\n❌ An error occurred during the build process: ${error.message}`);
     }
 }
 
 // Execute the main function
-buildTariffList();
+buildFromAllPartitions();
