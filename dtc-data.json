@@ -1,0 +1,35 @@
+[
+  {
+    "drug_name": "Wegovy (semaglutide)",
+    "cash_pay_price": "$499/month",
+    "uom": "28-day supply",
+    "form": "Prefilled pen",
+    "strengths": "0.25, 0.5, 1.0, 1.7, 2.4 mg",
+    "manufacturer_program": "Novo Nordisk (NovoCare Pharmacy)",
+    "price_start_date": "2025-03-05",
+    "website_name": "NovoCare Wegovy",
+    "website_url": "https://www.novocare.com/wegovy.html" 
+  },
+  {
+    "drug_name": "Ozempic (semaglutide)",
+    "cash_pay_price": "$499/month",
+    "uom": "28-day supply",
+    "form": "Prefilled pen",
+    "strengths": "0.25, 0.5, 1.0, 2.0 mg",
+    "manufacturer_program": "Novo Nordisk (NovoCare Pharmacy)",
+    "price_start_date": "2025-08-19",
+    "website_name": "NovoCare Ozempic",
+    "website_url": "https://www.novocare.com/ozempic.html" 
+  },
+  {
+    "drug_name": "Zepbound (tirzepatide – vials)",
+    "cash_pay_price": "$349 (2.5 mg); $499 (5 mg); $499 (7.5/10 mg w/ ≤45d refill)",
+    "uom": "28-day supply",
+    "form": "Single-dose vials",
+    "strengths": "2.5, 5, 7.5, 10 mg",
+    "manufacturer_program": "Eli Lilly (LillyDirect Self-Pay)",
+    "price_start_date": "2025-06-16",
+    "website_name": "LillyDirect",
+    "website_url": "https://www.lillydirect.com"
+  }
+]

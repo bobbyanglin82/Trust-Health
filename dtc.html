@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tariff Scope - TrustHealthcare</title>
+    <title>DTC Pricing - TrustHealthcare</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="/css/style.css">
@@ -27,31 +27,32 @@
                 <li class="nav__item"><a href="index.html#about" class="nav__link">About</a></li>
                 <li class="nav__item"><a href="index.html#work" class="nav__link">Our Work</a></li>
                 <li class="nav__item"><a href="ndc.html" class="nav__link">NDC Database</a></li>
+                <li class="nav__item"><a href="tariff.html" class="nav__link">Tariff Scope</a></li>
                 <li class="nav__item"><a href="dtc.html" class="nav__link">DTC Pricing</a></li>
             </ul>
         </nav>
     </header>
 
     <section class="scanner-section">
-        <h1 class="section__title">Tariff Scope Database</h1>
-        <p class="section__subtitle">A tool to analyze HTS codes and tariff data</p>
+        <h1 class="section__title">Direct-to-Consumer Drug Pricing</h1>
+        <p class="section__subtitle">A database of manufacturer cash pay programs</p>
                 
         <h2>Filtered Results</h2>
-        <input type="text" id="searchBox" class="search-input" placeholder="Search by NDC, Brand Name, Generic Name, or Labeler...">
+        <input type="text" id="searchBox" class="search-input" placeholder="Search by Drug Name, Manufacturer...">
         
         <button id="downloadBtn" class="btn" style="margin-top: 1em;">Download Filtered Data as CSV</button>
 
         <table id="resultsTable" class="scanner-table">
             <thead>
                 <tr>
-                    <th>Product NDC</th>
-                    <th>Labeler Name</th>
-                    <th>Proprietary Name (Brand Name)</th>
-                    <th>Non-Proprietary Name (Generic Name)</th>
-                    <th>Start Marketing Date</th>
-                    <th>Manufactured By</th>
-                    <th>Country</th>
-                    <th>Manufactured For</th>
+                    <th>Drug Name</th>
+                    <th>Cash Pay Price</th>
+                    <th>Unit of Measure</th>
+                    <th>Form</th>
+                    <th>Strength(s)</th>
+                    <th>Manufacturer / Program</th>
+                    <th>Price Start Date</th>
+                    <th>Website</th>
                 </tr>
             </thead>
             <tbody>
@@ -70,7 +71,7 @@
         </ul>
     </footer>
 
-    <script src="/js/tariff.js" defer></script>
+    <script src="/js/dtc.js" defer></script>
     <script src="/js/index.js" defer></script>
 </body>
 </html>

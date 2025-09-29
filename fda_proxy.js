@@ -225,6 +225,7 @@ cron.schedule('0 8 * * *', () => downloadData(), { timezone: "UTC" });
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/ndc.html', (req, res) => res.sendFile(path.join(__dirname, 'ndc.html')));
+app.get('/dtc.html', (req, res) => res.sendFile(path.join(__dirname, 'dtc.html')));
 app.get('/tariff.html', (req, res) => res.sendFile(path.join(__dirname, 'tariff.html')));
 app.get("/data", (req, res) => {
   const dataPath = path.join('/tmp', 'data.json');
