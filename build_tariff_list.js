@@ -1,7 +1,7 @@
-// FINAL SCRIPT: build_tariff_list.js (Processes All Partitions)
+// FINAL SCRIPT: build_tariff_list.js (Processes All Partitions with 3-Step NDC Logic)
 //
 // This script downloads ALL partitions of the OpenFDA drug label bulk data,
-// processes each one as a stream, and combines them into one final, comprehensive file.
+// processes each one, and uses a robust 3-step fallback to find the Product NDC.
 //
 const fs = require('fs');
 const path = require('path');
@@ -10,7 +10,6 @@ const JSONStream = require('JSONStream');
 const unzipper = require('unzipper');
 
 // --- START: Reused "Unpacker" and "Text Analyzer" Logic ---
-// This is the original, successful parser from your fda_proxy.js.
 function parseManufacturingInfo(labelData) {
     const info = {
         manufactured_by: null,
@@ -126,8 +125,15 @@ async function buildFromAllPartitions() {
 
                         if (manufacturingInfo.manufactured_by_country && manufacturingInfo.manufactured_by_country.toUpperCase() !== 'USA') {
                             const openfda = labelData.openfda || {};
+                            
+                            // *** NEW 3-STEP NDC LOGIC ***
+                            const ndcFromId = (labelData.id || '').split('_').pop();
+                            const product_ndc = openfda.product_ndc?.[0] 
+                                || labelData.product_ndc?.[0] 
+                                || (ndcFromId.includes('-') ? ndcFromId : 'N/A');
+
                             finalResults.push({
-                                product_ndc: openfda.product_ndc?.[0] || labelData.product_ndc?.[0] || 'N/A',
+                                product_ndc: product_ndc,
                                 labeler_name: openfda.manufacturer_name?.[0] || 'N/A',
                                 brand_name: openfda.brand_name?.[0] || 'N/A',
                                 generic_name: openfda.generic_name?.[0] || 'N/A',
@@ -150,7 +156,7 @@ async function buildFromAllPartitions() {
                     });
             });
 
-            await streamProcessing; // Wait for the current partition to finish before starting the next
+            await streamProcessing;
         }
 
         console.log(`\n✅ Phase 2 Complete. Total records processed across all partitions: ${totalProcessedCount}.`);
