@@ -8,7 +8,7 @@
     "manufacturer_program": "Novo Nordisk (NovoCare Pharmacy)",
     "price_start_date": "2025-03-05",
     "website_name": "NovoCare Wegovy",
-    "website_url": "https://www.novocare.com/wegovy.html" 
+    "website_url": ""
   },
   {
     "drug_name": "Ozempic (semaglutide)",
@@ -17,9 +17,9 @@
     "form": "Prefilled pen",
     "strengths": "0.25, 0.5, 1.0, 2.0 mg",
     "manufacturer_program": "Novo Nordisk (NovoCare Pharmacy)",
-    "price_start_date": "2025-08-19",
+    "price_start_date": "2025-08-19 (announced)",
     "website_name": "NovoCare Ozempic",
-    "website_url": "https://www.novocare.com/ozempic.html" 
+    "website_url": ""
   },
   {
     "drug_name": "Zepbound (tirzepatide – vials)",
@@ -30,6 +30,193 @@
     "manufacturer_program": "Eli Lilly (LillyDirect Self-Pay)",
     "price_start_date": "2025-06-16",
     "website_name": "LillyDirect",
-    "website_url": "https://www.lillydirect.com"
+    "website_url": ""
+  },
+  {
+    "drug_name": "Eliquis (apixaban)",
+    "cash_pay_price": "$346/30 days (60 tabs)",
+    "uom": "30-day supply",
+    "form": "Tablet",
+    "strengths": "2.5 mg, 5 mg",
+    "manufacturer_program": "BMS / Pfizer (Eliquis 360 Support)",
+    "price_start_date": "2025-09-08",
+    "website_name": "Eliquis Program",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Farxiga (dapagliflozin)",
+    "cash_pay_price": "$181.59/30 days",
+    "uom": "30-day supply",
+    "form": "Tablet",
+    "strengths": "5 mg, 10 mg",
+    "manufacturer_program": "AstraZeneca (AstraZeneca Direct)",
+    "price_start_date": "2025-10-01",
+    "website_name": "AstraZeneca Direct",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Airsupra (albuterol/budesonide)",
+    "cash_pay_price": "$249 per inhaler",
+    "uom": "1 inhaler (120 actuations)",
+    "form": "Inhalation aerosol",
+    "strengths": "90/80 mcg per actuation",
+    "manufacturer_program": "AstraZeneca (AstraZeneca Direct)",
+    "price_start_date": "2025-10-01",
+    "website_name": "AstraZeneca Direct",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Sotyktu (deucravacitinib)",
+    "cash_pay_price": "$950/month",
+    "uom": "30-day supply",
+    "form": "Tablet",
+    "strengths": "6 mg daily (typical)",
+    "manufacturer_program": "BMS (BMS Patient Connect)",
+    "price_start_date": "2026-01 (announced)",
+    "website_name": "BMS Patient Connect",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Lantus (insulin glargine)",
+    "cash_pay_price": "$35/month",
+    "uom": "30-day supply",
+    "form": "Vial or pens",
+    "strengths": "100 U/mL",
+    "manufacturer_program": "Sanofi (Insulins Valyou)",
+    "price_start_date": "Active; expands 2026-01-01",
+    "website_name": "Sanofi Program",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Toujeo (insulin glargine U-300)",
+    "cash_pay_price": "$35/month",
+    "uom": "30-day supply",
+    "form": "Pens",
+    "strengths": "300 U/mL",
+    "manufacturer_program": "Sanofi (Insulins Valyou)",
+    "price_start_date": "Active; expands 2026-01-01",
+    "website_name": "Toujeo Program",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Apidra (insulin glulisine)",
+    "cash_pay_price": "$35/month",
+    "uom": "30-day supply",
+    "form": "Vial or pens",
+    "strengths": "100 U/mL",
+    "manufacturer_program": "Sanofi (Insulins Valyou)",
+    "price_start_date": "Active; expands 2026-01-01",
+    "website_name": "Apidra Program",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Admelog (insulin lispro)",
+    "cash_pay_price": "$35/month",
+    "uom": "30-day supply",
+    "form": "Vial or pens",
+    "strengths": "100 U/mL",
+    "manufacturer_program": "Sanofi (Insulins Valyou)",
+    "price_start_date": "Active; expands 2026-01-01",
+    "website_name": "Admelog Program",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Humalog family (insulin lispro)",
+    "cash_pay_price": "$35/month",
+    "uom": "30-day supply",
+    "form": "Vial or pens",
+    "strengths": "various",
+    "manufacturer_program": "Eli Lilly (Insulin Value Program)",
+    "price_start_date": "2020-04-07 (ongoing)",
+    "website_name": "Lilly Program",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Humulin family (human insulin)",
+    "cash_pay_price": "$35/month",
+    "uom": "30-day supply",
+    "form": "Vial or pens",
+    "strengths": "various incl. U-500",
+    "manufacturer_program": "Eli Lilly (Insulin Value Program)",
+    "price_start_date": "2020-04-07 (ongoing)",
+    "website_name": "Lilly Program",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Rezvoglar (insulin glargine-aglr)",
+    "cash_pay_price": "$35/month",
+    "uom": "30-day supply",
+    "form": "Pens",
+    "strengths": "100 U/mL",
+    "manufacturer_program": "Eli Lilly (Insulin Value Program)",
+    "price_start_date": "2020-04-07 (ongoing)",
+    "website_name": "Lilly Program",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Tresiba / NovoLog / Fiasp / NovoLog Mix 70/30",
+    "cash_pay_price": "$35/month (≤3 vials or 2 pen packs; 35 mL)",
+    "uom": "30-day supply",
+    "form": "Vial or pens",
+    "strengths": "100 U/mL, 200 U/mL (Tresiba)",
+    "manufacturer_program": "Novo Nordisk (MyInsulinRx)",
+    "price_start_date": "Active",
+    "website_name": "NovoCare",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Synthroid (levothyroxine)",
+    "cash_pay_price": "$29.50 (30 tabs); $54 (60); $75 (90)",
+    "uom": "per number of tablets",
+    "form": "Tablet",
+    "strengths": "Various strengths",
+    "manufacturer_program": "AbbVie (Synthroid Delivers via Eagle Pharmacy)",
+    "price_start_date": "N/A",
+    "website_name": "Eagle Synthroid",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Inderal LA (propranolol HCl)",
+    "cash_pay_price": "$50 (30 caps); $125 (90 caps)",
+    "uom": "per capsule count",
+    "form": "Capsule (long-acting)",
+    "strengths": "60, 80, 120, 160 mg",
+    "manufacturer_program": "Eagle Pharmacy program",
+    "price_start_date": "N/A",
+    "website_name": "Eagle Inderal",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Betimol (timolol ophthalmic sol.)",
+    "cash_pay_price": "$60 (5 mL)",
+    "uom": "per bottle",
+    "form": "Ophthalmic solution",
+    "strengths": "0.25%, 0.5%",
+    "manufacturer_program": "EyeRx Direct via Eagle",
+    "price_start_date": "N/A",
+    "website_name": "Eagle Betimol",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Azasite (azithromycin ophth. sol.)",
+    "cash_pay_price": "$60 (2.5 mL); $180 (7.5 mL)",
+    "uom": "per bottle",
+    "form": "Ophthalmic solution",
+    "strengths": "1%",
+    "manufacturer_program": "EyeRx Direct via Eagle",
+    "price_start_date": "N/A",
+    "website_name": "Eagle Azasite",
+    "website_url": ""
+  },
+  {
+    "drug_name": "Toprol AG (metoprolol succinate)",
+    "cash_pay_price": "$30 (30 tabs); $76.50 (90 tabs)",
+    "uom": "per number of tablets",
+    "form": "Tablet",
+    "strengths": "50 mg (example)",
+    "manufacturer_program": "Eagle Pharmacy program",
+    "price_start_date": "N/A",
+    "website_name": "Eagle Toprol AG",
+    "website_url": ""
   }
 ]
