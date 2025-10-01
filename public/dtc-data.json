@@ -8,7 +8,7 @@
     "manufacturer_program": "Novo Nordisk (NovoCare Pharmacy)",
     "price_start_date": "2025-03-05",
     "website_name": "NovoCare Wegovy",
-    "website_url": ""
+    "website_url": "https://www.novocare.com/"
   },
   {
     "drug_name": "Ozempic (semaglutide)",
@@ -19,7 +19,7 @@
     "manufacturer_program": "Novo Nordisk (NovoCare Pharmacy)",
     "price_start_date": "2025-08-19 (announced)",
     "website_name": "NovoCare Ozempic",
-    "website_url": ""
+    "website_url": "https://www.novocare.com/"
   },
   {
     "drug_name": "Zepbound (tirzepatide – vials)",
@@ -30,7 +30,7 @@
     "manufacturer_program": "Eli Lilly (LillyDirect Self-Pay)",
     "price_start_date": "2025-06-16",
     "website_name": "LillyDirect",
-    "website_url": ""
+    "website_url": "https://www.lilly.com/lillydirect/"
   },
   {
     "drug_name": "Eliquis (apixaban)",
@@ -41,7 +41,7 @@
     "manufacturer_program": "BMS / Pfizer (Eliquis 360 Support)",
     "price_start_date": "2025-09-08",
     "website_name": "Eliquis Program",
-    "website_url": ""
+    "website_url": "https://www.eliquis.bmscustomerconnect.com/"
   },
   {
     "drug_name": "Farxiga (dapagliflozin)",
@@ -74,7 +74,7 @@
     "manufacturer_program": "BMS (BMS Patient Connect)",
     "price_start_date": "2026-01 (announced)",
     "website_name": "BMS Patient Connect",
-    "website_url": ""
+    "website_url": "https://www.sotyktu.com/"
   },
   {
     "drug_name": "Lantus (insulin glargine)",
@@ -85,7 +85,7 @@
     "manufacturer_program": "Sanofi (Insulins Valyou)",
     "price_start_date": "Active; expands 2026-01-01",
     "website_name": "Sanofi Program",
-    "website_url": ""
+    "website_url": "https://www.sanofipatientconnection.com/"
   },
   {
     "drug_name": "Toujeo (insulin glargine U-300)",
@@ -96,7 +96,7 @@
     "manufacturer_program": "Sanofi (Insulins Valyou)",
     "price_start_date": "Active; expands 2026-01-01",
     "website_name": "Toujeo Program",
-    "website_url": ""
+    "website_url": "https://www.sanofipatientconnection.com/"
   },
   {
     "drug_name": "Apidra (insulin glulisine)",
@@ -107,7 +107,7 @@
     "manufacturer_program": "Sanofi (Insulins Valyou)",
     "price_start_date": "Active; expands 2026-01-01",
     "website_name": "Apidra Program",
-    "website_url": ""
+    "website_url": "https://www.sanofipatientconnection.com/"
   },
   {
     "drug_name": "Admelog (insulin lispro)",
@@ -118,7 +118,7 @@
     "manufacturer_program": "Sanofi (Insulins Valyou)",
     "price_start_date": "Active; expands 2026-01-01",
     "website_name": "Admelog Program",
-    "website_url": ""
+    "website_url": "https://www.sanofipatientconnection.com/"
   },
   {
     "drug_name": "Humalog family (insulin lispro)",
@@ -129,7 +129,7 @@
     "manufacturer_program": "Eli Lilly (Insulin Value Program)",
     "price_start_date": "2020-04-07 (ongoing)",
     "website_name": "Lilly Program",
-    "website_url": ""
+    "website_url": "https://insulinaffordability.lilly.com/"
   },
   {
     "drug_name": "Humulin family (human insulin)",
@@ -140,7 +140,7 @@
     "manufacturer_program": "Eli Lilly (Insulin Value Program)",
     "price_start_date": "2020-04-07 (ongoing)",
     "website_name": "Lilly Program",
-    "website_url": ""
+    "website_url": "https://insulinaffordability.lilly.com/"
   },
   {
     "drug_name": "Rezvoglar (insulin glargine-aglr)",
@@ -151,7 +151,7 @@
     "manufacturer_program": "Eli Lilly (Insulin Value Program)",
     "price_start_date": "2020-04-07 (ongoing)",
     "website_name": "Lilly Program",
-    "website_url": ""
+    "website_url": "https://insulinaffordability.lilly.com/"
   },
   {
     "drug_name": "Tresiba / NovoLog / Fiasp / NovoLog Mix 70/30",
@@ -162,7 +162,7 @@
     "manufacturer_program": "Novo Nordisk (MyInsulinRx)",
     "price_start_date": "Active",
     "website_name": "NovoCare",
-    "website_url": ""
+    "website_url": "https://www.novocare.com/"
   },
   {
     "drug_name": "Synthroid (levothyroxine)",
@@ -173,7 +173,7 @@
     "manufacturer_program": "AbbVie (Synthroid Delivers via Eagle Pharmacy)",
     "price_start_date": "N/A",
     "website_name": "Eagle Synthroid",
-    "website_url": ""
+    "website_url": "https://www.eaglepharmacy.com/"
   },
   {
     "drug_name": "Inderal LA (propranolol HCl)",
@@ -184,7 +184,7 @@
     "manufacturer_program": "Eagle Pharmacy program",
     "price_start_date": "N/A",
     "website_name": "Eagle Inderal",
-    "website_url": ""
+    "website_url": "https://www.eaglepharmacy.com/"
   },
   {
     "drug_name": "Betimol (timolol ophthalmic sol.)",
@@ -195,7 +195,7 @@
     "manufacturer_program": "EyeRx Direct via Eagle",
     "price_start_date": "N/A",
     "website_name": "Eagle Betimol",
-    "website_url": ""
+    "website_url": "https://www.eaglepharmacy.com/"
   },
   {
     "drug_name": "Azasite (azithromycin ophth. sol.)",
@@ -206,7 +206,7 @@
     "manufacturer_program": "EyeRx Direct via Eagle",
     "price_start_date": "N/A",
     "website_name": "Eagle Azasite",
-    "website_url": ""
+    "website_url": "https://www.eaglepharmacy.com/"
   },
   {
     "drug_name": "Toprol AG (metoprolol succinate)",
@@ -217,6 +217,6 @@
     "manufacturer_program": "Eagle Pharmacy program",
     "price_start_date": "N/A",
     "website_name": "Eagle Toprol AG",
-    "website_url": ""
+    "website_url": "https://www.eaglepharmacy.com/"
   }
 ]
