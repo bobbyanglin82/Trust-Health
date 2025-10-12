@@ -3,7 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const cron = require('node-cron');
-
+const xlsx = require('xlsx');
+const { TOP_50_DRUGS } = require('./drug_list.js');
 const app = express();
 
 const knownEntities = [
@@ -129,6 +130,199 @@ function parseManufacturingInfo(labelData) {
     return info;
 }
 
+/**
+ * ===================================================================================
+ * ENGINE 3: OPENFDA DATA ENRICHMENT (DEFINITIVE & CORRECTED)
+ * This version uses the correct search strategy for the OpenFDA NDC Directory API.
+ * It searches by the searchable 'brand_name' field, then filters the results
+ * to find the entry that matches our specific 'product_ndc'.
+ * ===================================================================================
+ */
+async function fetchExpirationDateForDrug(drug) {
+    // We need the drug object for both its name (for searching) and its NDC (for matching).
+    if (!drug || !drug.drugName || !drug.ndc10) {
+        return "N/A - Missing Drug Info";
+    }
+
+    try {
+        // Step 1: Search by the brand_name, which is a valid searchable field.
+        const searchName = drug.drugName.split(' ')[0]; // Use first word for broader match (e.g., "Keytruda" not "Keytruda QLEX")
+        const url = `https://api.fda.gov/drug/ndc.json?search=brand_name:"${searchName}"&limit=100`;
+        console.log(`Querying OpenFDA for Brand Name: ${searchName}`);
+        
+        const response = await axios.get(url);
+
+        // Step 2: Filter the results to find our specific product.
+        if (response.data.results && response.data.results.length > 0) {
+            const ndcParts = drug.ndc10.split('-');
+            const targetProductNdc = `${ndcParts[0]}-${ndcParts[1]}`;
+
+            for (const result of response.data.results) {
+                // If the product_ndc from the API result matches our target, we have the right drug.
+                if (result.product_ndc === targetProductNdc) {
+                    const expirationDate = result.listing_expiration_date;
+                    const year = expirationDate.substring(0, 4);
+                    const month = expirationDate.substring(4, 6);
+                    const day = expirationDate.substring(6, 8);
+                    
+                    console.log(`SUCCESS: Found match for ${drug.drugName}`);
+                    return `${year}-${month}-${day}`;
+                }
+            }
+        }
+        
+        console.warn(`No exact product_ndc match found for ${drug.drugName} in the results.`);
+        return "Date Not Found";
+
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            console.warn(`No records found for Brand Name: ${drug.drugName}`);
+            return "Date Not Found";
+        }
+        console.error(`Error fetching data for ${drug.drugName}:`, error.message);
+        return "Error During Lookup";
+    }
+}
+
+// Add these new 'require' statements at the top of your server.js file
+const fs = require('fs').promises;
+const xlsx = require('xlsx');
+
+/**
+ * ===================================================================================
+ * ENGINE 4, PART 1: VA DATA FILE PROCESSOR (Corrected Columns & Logic)
+ * Downloads and parses the VA's master .xlsx data file from the OPAL source.
+ * This version uses the correct column indexes and combines the separate FSS and Big 4 rows.
+ * ===================================================================================
+ */
+async function updateVaPriceCache() {
+    console.log("Starting VA Price Cache Update from Excel file...");
+    try {
+        // 1. DOWNLOAD THE VA's MASTER PRICING FILE (.xlsx)
+        const vaFileURL = 'https://www.va.gov/opal/docs/nac/fss/vaFssPharmPrices.xlsx';
+        console.log(`Downloading VA master Excel file from: ${vaFileURL}`);
+        
+        const response = await axios({
+            method: 'get',
+            url: vaFileURL,
+            responseType: 'arraybuffer'
+        });
+
+        // 2. PARSE THE EXCEL FILE AND AGGREGATE THE PRICE DATA
+        console.log("Parsing and aggregating data from Excel file...");
+        const workbook = xlsx.read(response.data, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+
+        const priceMap = {};
+        // Start loop at 1 to skip the header row
+        for (let i = 1; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            
+            // CORRECTED COLUMN POSITIONS based on your screenshot
+            const ndc11 = row[4];      // Column E is the 11-digit NDC
+            const price = row[12];     // Column M is the Price
+            const priceType = row[15]; // Column P is the Price Type ('FSS' or 'Big4')
+
+            if (ndc11 && price && priceType) {
+                const ndcString = String(ndc11).trim();
+
+                // If we haven't seen this NDC before, initialize it.
+                if (!priceMap[ndcString]) {
+                    priceMap[ndcString] = {
+                        fss_price: "N/A",
+                        big4_price: "N/A"
+                    };
+                }
+
+                // Populate the correct price based on the type.
+                if (String(priceType).trim().toLowerCase() === 'fss') {
+                    priceMap[ndcString].fss_price = price;
+                } else if (String(priceType).trim().toLowerCase() === 'big4') {
+                    priceMap[ndcString].big4_price = price;
+                }
+            }
+        }
+        console.log(`VA Excel file parsed. Found prices for ${Object.keys(priceMap).length} NDCs.`);
+
+        // 3. LOOK UP OUR 50 DRUGS AND CREATE THE FINAL CACHE OBJECT
+        const vaPriceCache = {};
+        for (const drug of TOP_50_DRUGS) {
+            if (drug.ndc11 && priceMap[drug.ndc11]) {
+                vaPriceCache[drug.ndc11] = priceMap[drug.ndc11];
+            } else if (drug.ndc11) {
+                vaPriceCache[drug.ndc11] = { fss_price: "Not Found in VA File", big4_price: "Not Found in VA File" };
+            }
+        }
+
+        // 4. SAVE THE CACHE TO A LOCAL FILE
+        const cacheFilePath = './va_price_cache.json';
+        await fs.writeFile(cacheFilePath, JSON.stringify(vaPriceCache, null, 2));
+        console.log(`VA price cache successfully written to ${cacheFilePath}`);
+        
+        return { success: true, message: `Cache written to ${cacheFilePath}`, data: vaPriceCache };
+
+    } catch (error) {
+        console.error("Error updating VA price cache:", error.message);
+        return { success: false, message: error.message };
+    }
+}
+
+/**
+ * ===================================================================================
+ * ENGINE 4, PART 2: MASTER DATA BUILDER
+ * Orchestrates the full data-gathering process. It calls the VA cache builder,
+ * fetches live FDA data, and combines everything into a single master data file.
+ * ===================================================================================
+ */
+async function buildDrugDataCache() {
+    console.log("Starting master data cache build...");
+    try {
+        // 1. First, ensure the VA price cache is up-to-date by running the function from Step 1.
+        const vaCacheResult = await updateVaPriceCache();
+        if (!vaCacheResult.success) {
+            throw new Error("Failed to update VA price cache. Aborting master build.");
+        }
+
+        // 2. Read the newly created VA price cache from disk.
+        const vaPriceData = vaCacheResult.data;
+
+        // 3. Loop through the master drug list and enrich each entry.
+        const finalDrugData = [];
+        console.log("Enriching drug list with VA prices and live FDA data...");
+        for (const drug of TOP_50_DRUGS) {
+            // Get VA prices from our local cache
+            const vaPrices = vaPriceData[drug.ndc11] || { fss_price: "N/A", big4_price: "N/A" };
+            
+            // Get expiration date from a live API call to OpenFDA
+            const expirationDate = await fetchExpirationDateForDrug(drug);
+
+            // Combine all data points into a single object
+            finalDrugData.push({
+                ...drug, // This includes rank, drugName, form, strength, ndc11, etc.
+                listing_expiration_date: expirationDate,
+                fss_price: vaPrices.fss_price,
+                big4_price: vaPrices.big4_price,
+            });
+
+            // Optional: small delay between live FDA API calls
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        // 4. Save the final, combined data to the master cache file.
+        const finalCachePath = path.join(__dirname, 'public', 'drug_data_cache.json');
+        await fs.writeFile(finalCachePath, JSON.stringify(finalDrugData, null, 2));
+        console.log(`Master drug data cache successfully written to ${finalCachePath}`);
+
+        return { success: true, message: `Master cache written to ${finalCachePath}`, recordCount: finalDrugData.length };
+
+    } catch (error) {
+        console.error("Error building master drug data cache:", error.message);
+        return { success: false, message: error.message };
+    }
+}
+
 async function downloadData() {
   let rawLabelDataForExport = [];
   console.log('--- Starting data download at', new Date().toLocaleTimeString(), '---');
@@ -242,6 +436,36 @@ app.get("/debug-file", (req, res) => {
   } else {
     res.status(404).send("Debug file not found. The downloadData script may not have completed successfully or created the file yet.");
   }
+});
+
+/**
+ * ===================================================================================
+ * FINAL PUBLIC ENDPOINT
+ * Reads and serves the pre-built data cache for the FairRX table.
+ * ===================================================================================
+ */
+app.get('/api/get-table-data', async (req, res) => {
+    const cacheFilePath = path.join(__dirname, 'public', 'drug_data_cache.json');
+    try {
+        const data = await fs.promises.readFile(cacheFilePath, 'utf8');
+        res.setHeader('Content-Type', 'application/json');
+        res.send(data);
+    } catch (error) {
+        console.error("Error reading data cache:", error);
+        res.status(500).json({ error: "Data cache not available. Please run the data refresh process." });
+    }
+});
+
+/**
+ * ===================================================================================
+ * FINAL TRIGGER ENDPOINT
+ * Runs the master data builder to refresh the cache.
+ * ===================================================================================
+ */
+app.get('/api/refresh-data-cache', async (req, res) => {
+    console.log("Data cache refresh triggered via API endpoint.");
+    buildDrugDataCache(); // Run in background
+    res.status(202).json({ message: "Accepted. The data cache build process has started." });
 });
 
 const PORT = process.env.PORT || 3001;
