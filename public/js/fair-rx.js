@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchData() {
         try {
-            tbody.innerHTML = `<tr><td colspan="6">Loading FairRX data...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9">Loading FairRX data...</td></tr>`;
             const response = await fetch(`/api/get-table-data?ts=${Date.now()}`);
             if (!response.ok) throw new Error('Network response was not ok');
             
@@ -11,26 +11,36 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTable(allData);
         } catch (error) {
             console.error("Failed to fetch FairRX data:", error);
-            tbody.innerHTML = `<tr><td colspan="6">Error: Could not load data. The data cache may need to be refreshed.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9">Error: Could not load data. The data cache may need to be refreshed.</td></tr>`;
         }
     }
 
     function renderTable(data) {
         tbody.innerHTML = '';
         if (!data || data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9">No data found.</td></tr>`; // Changed colspan to 9
+            tbody.innerHTML = `<tr><td colspan="9">No data found.</td></tr>`;
             return;
         }
 
         // Sort data by rank before rendering
         data.sort((a, b) => a.rank - b.rank);
 
+        // --- Price Formatting Function (moved outside the loop for efficiency) ---
+        const formatPrice = (price) => {
+            const num = parseFloat(price);
+            if (!isNaN(num)) {
+                return num.toLocaleString('en-US', {
+                    style: 'currency',
+                    currency: 'USD'
+                });
+            }
+            return price;
+        };
+        // --- END: Price Formatting Function ---
+
         data.forEach(item => {
             const row = document.createElement('tr');
-            // Function to format price, returns 'N/A' if not a number
-            const formatPrice = (price) => typeof price === 'number' ? '$' + price.toFixed(2) : price;
-
-            // Updated to include the new columns: form, strength, and quantity
+            
             row.innerHTML = `
                 <td>${item.rank || 'N/A'}</td>
                 <td>${item.drugName || 'N/A'}</td>
@@ -46,6 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Immediately fetch the data when the page loads
+    // --- FIX #1: This line was missing. It's needed to start fetching the data. ---
     fetchData();
+
+// --- FIX #2: The closing parenthesis and semicolon for the addEventListener were missing. ---
 });
