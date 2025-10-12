@@ -419,6 +419,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/ndc.html', (req, res) => res.sendFile(path.join(__dirname, 'ndc.html')));
 app.get('/dtc.html', (req, res) => res.sendFile(path.join(__dirname, 'dtc.html')));
 app.get('/tariff.html', (req, res) => res.sendFile(path.join(__dirname, 'tariff.html')));
+app.get('/fair-rx.html', (req, res) => res.sendFile(path.join(__dirname, 'fair-rx.html')));
 
 // *** FIX APPLIED HERE: Converted route handler to async and replaced fs.existsSync ***
 app.get("/data", async (req, res) => {
