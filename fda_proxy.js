@@ -130,6 +130,68 @@ function parseManufacturingInfo(labelData) {
     
     return info;
 }
+const unzipper = require('unzipper');
+
+/**
+ * ===================================================================================
+ * ENGINE 5, PART 1: MFP CSV PARSER (FULLY AUTOMATED)
+ * Downloads the CMS MFP zip file, finds the CSV inside, and parses it.
+ * Returns a Map where the key is the 11-digit NDC and the value is the price/unit.
+ * ===================================================================================
+ */
+async function parseMfpCsvAndCreateMap() {
+    const mfpPriceMap = new Map();
+    const url = 'https://www.cms.gov/files/zip/file-negotiated-prices-also-known-maximum-fair-prices-statute.zip';
+    console.log(`Downloading MFP data from: ${url}`);
+
+    return new Promise(async (resolve, reject) => {
+        try {
+            const response = await axios({
+                method: 'get',
+                url: url,
+                responseType: 'stream'
+            });
+
+            response.data
+                .pipe(unzipper.Parse())
+                .on('entry', function (entry) {
+                    const fileName = entry.path;
+                    // We are looking for the CSV file inside the zip
+                    if (fileName.endsWith('.csv')) {
+                        console.log(`Found CSV file in archive: ${fileName}`);
+                        entry.pipe(csv())
+                            .on('data', (row) => {
+                                const ndc = row['11-Digit National Drug Code (NDC)'];
+                                const priceStr = row['2026 Maximum Fair Price (MFP)'];
+                                const unit = row['MFP Unit'];
+
+                                if (ndc && priceStr && unit) {
+                                    const price = parseFloat(priceStr.replace(/[$,]/g, ''));
+                                    if (!isNaN(price)) {
+                                        mfpPriceMap.set(ndc.trim(), { price, unit });
+                                    }
+                                }
+                            })
+                            .on('end', () => {
+                                console.log('✅ CMS Maximum Fair Price CSV file successfully processed.');
+                                resolve(mfpPriceMap);
+                            });
+                    } else {
+                        // This will discard any other files in the zip (like PDFs, etc.)
+                        entry.autodrain();
+                    }
+                })
+                .on('error', (error) => {
+                    console.error('❌ Error processing ZIP file stream:', error);
+                    reject(error);
+                });
+
+        } catch (error) {
+            console.error('❌ Error downloading the MFP ZIP file:', error.message);
+            reject(error);
+        }
+    });
+}
 
 /**
  * ===================================================================================
@@ -269,26 +331,26 @@ async function updateVaPriceCache() {
 
 /**
  * ===================================================================================
- * ENGINE 4, PART 2: MASTER DATA BUILDER
- * Orchestrates the full data-gathering process. It calls the VA cache builder,
- * fetches live FDA data, and combines everything into a single master data file.
+ * ENGINE 4, PART 2: MASTER DATA BUILDER (UPDATED)
+ * Orchestrates the full data-gathering process. It now includes MFP data.
  * ===================================================================================
  */
 async function buildDrugDataCache() {
     console.log("Starting master data cache build...");
     try {
-        // 1. First, ensure the VA price cache is up-to-date by running the function from Step 1.
+        // 1. First, ensure the VA price cache is up-to-date.
         const vaCacheResult = await updateVaPriceCache();
         if (!vaCacheResult.success) {
             throw new Error("Failed to update VA price cache. Aborting master build.");
         }
-
-        // 2. Read the newly created VA price cache from disk.
         const vaPriceData = vaCacheResult.data;
+
+        // 2. NEW: Parse the MFP data file and create the price map.
+        const mfpPriceMap = await parseMfpCsvAndCreateMap();
 
         // 3. Loop through the master drug list and enrich each entry.
         const finalDrugData = [];
-        console.log("Enriching drug list with VA prices and live FDA data...");
+        console.log("Enriching drug list with VA prices, FDA data, and MFP prices...");
         for (const drug of TOP_50_DRUGS) {
             // Get VA prices from our local cache
             const vaPrices = vaPriceData[drug.ndc11] || { fss_price: "N/A", big4_price: "N/A" };
@@ -296,15 +358,25 @@ async function buildDrugDataCache() {
             // Get expiration date from a live API call to OpenFDA
             const expirationDate = await fetchExpirationDateForDrug(drug);
 
+            // NEW: Look up MFP data and perform UOM calculation
+            let calculatedMfp = "N/A";
+            if (drug.ndc11 && mfpPriceMap.has(drug.ndc11)) {
+                const mfpData = mfpPriceMap.get(drug.ndc11);
+                // Check if the unit is per item ('each') and quantity is a number
+                if (mfpData.unit.toLowerCase() === 'each' && !isNaN(parseInt(drug.quantity))) {
+                    calculatedMfp = mfpData.price * parseInt(drug.quantity);
+                }
+            }
+
             // Combine all data points into a single object
             finalDrugData.push({
-                ...drug, // This includes rank, drugName, form, strength, ndc11, etc.
+                ...drug,
                 listing_expiration_date: expirationDate,
                 fss_price: vaPrices.fss_price,
                 big4_price: vaPrices.big4_price,
+                maximum_fair_price: calculatedMfp // Add the new MFP data
             });
 
-            // Optional: small delay between live FDA API calls
             await new Promise(resolve => setTimeout(resolve, 100));
         }
 

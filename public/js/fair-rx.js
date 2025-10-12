@@ -3,7 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchData() {
         try {
-            tbody.innerHTML = `<tr><td colspan="9">Loading FairRX data...</td></tr>`;
+            // Updated colspan to 10
+            tbody.innerHTML = `<tr><td colspan="10">Loading FairRX data...</td></tr>`;
             const response = await fetch(`/api/get-table-data?ts=${Date.now()}`);
             if (!response.ok) throw new Error('Network response was not ok');
             
@@ -11,21 +12,21 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTable(allData);
         } catch (error) {
             console.error("Failed to fetch FairRX data:", error);
-            tbody.innerHTML = `<tr><td colspan="9">Error: Could not load data. The data cache may need to be refreshed.</td></tr>`;
+            // Updated colspan to 10
+            tbody.innerHTML = `<tr><td colspan="10">Error: Could not load data. The data cache may need to be refreshed.</td></tr>`;
         }
     }
 
     function renderTable(data) {
         tbody.innerHTML = '';
         if (!data || data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9">No data found.</td></tr>`;
+            // Updated colspan to 10
+            tbody.innerHTML = `<tr><td colspan="10">No data found.</td></tr>`;
             return;
         }
 
-        // Sort data by rank before rendering
         data.sort((a, b) => a.rank - b.rank);
 
-        // --- Price Formatting Function (moved outside the loop for efficiency) ---
         const formatPrice = (price) => {
             const num = parseFloat(price);
             if (!isNaN(num)) {
@@ -36,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return price;
         };
-        // --- END: Price Formatting Function ---
 
         data.forEach(item => {
             const row = document.createElement('tr');
@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${item.ndc11 || 'N/A'}</td>
                 <td>${formatPrice(item.fss_price)}</td>
                 <td>${formatPrice(item.big4_price)}</td>
+                <td>${formatPrice(item.maximum_fair_price)}</td>
                 <td>${item.listing_expiration_date || 'N/A'}</td>
             `;
             tbody.appendChild(row);
