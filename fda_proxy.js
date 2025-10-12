@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
 const axios = require('axios');
 const cron = require('node-cron');
 const xlsx = require('xlsx');
