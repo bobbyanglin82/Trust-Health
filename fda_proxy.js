@@ -479,6 +479,7 @@ const PORT = process.env.PORT || 3001;
 async function startServer() {
   console.log('--- Server starting up ---');
   await downloadData();
+  await buildDrugDataCache();
   app.listen(PORT, () => {
     console.log(`✅ Data is ready. Server is now live and listening on port ${PORT}`);
   });
