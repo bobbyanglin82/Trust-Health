@@ -22,7 +22,7 @@ async function exportRawNdcQueryResults() {
   try {
     console.log(`Querying API: ${apiUrl}`);
     const response = await axios.get(apiUrl);
-    fs.writeFileSync(outputPath, JSON.stringify(response.data, null, 2));
+    await fs.writeFile(outputPath, JSON.stringify(enrichedResults, null, 2));
     console.log(`✅ Success! The raw API response has been saved to: ${outputPath}`);
   } catch (error) {
     console.error('❌ Error during raw data export:', error.message);
@@ -334,7 +334,7 @@ async function downloadData() {
 
     if (!labelResults || labelResults.length === 0) {
       console.log('✅ No records found for the specified entities in the Label API.');
-      fs.writeFileSync(outputPath, '[]');
+      await fs.writeFile(outputPath, '[]');
       return;
     }
     
@@ -401,13 +401,13 @@ async function downloadData() {
       });
     }
 
-    fs.writeFileSync(outputPath, JSON.stringify(enrichedResults, null, 2));
+    await fs.writeFile(outputPath, JSON.stringify(enrichedResults, null, 2));
     console.log(`✅ File write to data.json complete.`);
 
   } catch (error) {
     console.error('❌ Error during data download:', error.message);
     // Create an empty file on error so the site doesn't break
-    fs.writeFileSync(outputPath, '[]');
+    await fs.writeFile(outputPath, '[]');
   }
 }
 
