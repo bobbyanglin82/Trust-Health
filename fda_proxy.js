@@ -184,9 +184,6 @@ async function fetchExpirationDateForDrug(drug) {
     }
 }
 
-// Add these new 'require' statements at the top of your server.js file
-const fs = require('fs').promises;
-const xlsx = require('xlsx');
 
 /**
  * ===================================================================================
