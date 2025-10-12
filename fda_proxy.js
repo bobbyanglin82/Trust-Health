@@ -133,7 +133,6 @@ function parseManufacturingInfo(labelData) {
     
     return info;
 }
-const unzipper = require('unzipper');
 
 /**
  * ===================================================================================
