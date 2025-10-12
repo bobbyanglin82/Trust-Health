@@ -4,10 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchData() {
         try {
             tbody.innerHTML = `<tr><td colspan="6">Loading FairRX data...</td></tr>`;
-            // Fetch data from our new public endpoint
             const response = await fetch(`/api/get-table-data?ts=${Date.now()}`);
             if (!response.ok) throw new Error('Network response was not ok');
-
+            
             const allData = await response.json();
             renderTable(allData);
         } catch (error) {
@@ -23,19 +22,26 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Sort data by rank before rendering
+        data.sort((a, b) => a.rank - b.rank);
+
         data.forEach(item => {
             const row = document.createElement('tr');
+            // Function to format price, returns 'N/A' if not a number
+            const formatPrice = (price) => typeof price === 'number' ? '$' + price.toFixed(2) : price;
+
             row.innerHTML = `
                 <td>${item.rank || 'N/A'}</td>
                 <td>${item.drugName || 'N/A'}</td>
                 <td>${item.ndc11 || 'N/A'}</td>
-                <td>${typeof item.fss_price === 'number' ? '$' + item.fss_price.toFixed(2) : item.fss_price}</td>
-                <td>${typeof item.big4_price === 'number' ? '$' + item.big4_price.toFixed(2) : item.big4_price}</td>
+                <td>${formatPrice(item.fss_price)}</td>
+                <td>${formatPrice(item.big4_price)}</td>
                 <td>${item.listing_expiration_date || 'N/A'}</td>
             `;
             tbody.appendChild(row);
         });
     }
 
+    // Immediately fetch the data when the page loads
     fetchData();
 });
