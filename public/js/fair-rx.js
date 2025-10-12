@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTable(data) {
         tbody.innerHTML = '';
         if (!data || data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6">No data found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9">No data found.</td></tr>`; // Changed colspan to 9
             return;
         }
 
@@ -30,9 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Function to format price, returns 'N/A' if not a number
             const formatPrice = (price) => typeof price === 'number' ? '$' + price.toFixed(2) : price;
 
+            // Updated to include the new columns: form, strength, and quantity
             row.innerHTML = `
                 <td>${item.rank || 'N/A'}</td>
                 <td>${item.drugName || 'N/A'}</td>
+                <td>${item.form || 'N/A'}</td>
+                <td>${item.strength || 'N/A'}</td>
+                <td>${item.quantity || 'N/A'}</td>
                 <td>${item.ndc11 || 'N/A'}</td>
                 <td>${formatPrice(item.fss_price)}</td>
                 <td>${formatPrice(item.big4_price)}</td>
