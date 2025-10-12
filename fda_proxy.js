@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs').promises; // Using the promise-based version
 const axios = require('axios');
 const cron = require('node-cron');
 const xlsx = require('xlsx');
@@ -22,7 +22,8 @@ async function exportRawNdcQueryResults() {
   try {
     console.log(`Querying API: ${apiUrl}`);
     const response = await axios.get(apiUrl);
-    await fs.writeFile(outputPath, JSON.stringify(enrichedResults, null, 2));
+    // No change needed here, already using await
+    await fs.writeFile(outputPath, JSON.stringify(response.data, null, 2));
     console.log(`✅ Success! The raw API response has been saved to: ${outputPath}`);
   } catch (error) {
     console.error('❌ Error during raw data export:', error.message);
@@ -418,19 +419,25 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/ndc.html', (req, res) => res.sendFile(path.join(__dirname, 'ndc.html')));
 app.get('/dtc.html', (req, res) => res.sendFile(path.join(__dirname, 'dtc.html')));
 app.get('/tariff.html', (req, res) => res.sendFile(path.join(__dirname, 'tariff.html')));
-app.get("/data", (req, res) => {
+
+// *** FIX APPLIED HERE: Converted route handler to async and replaced fs.existsSync ***
+app.get("/data", async (req, res) => {
   const dataPath = path.join('/tmp', 'data.json');
-  if (fs.existsSync(dataPath)) {
+  try {
+    await fs.access(dataPath); // Check if the file exists and is accessible
     res.sendFile(dataPath);
-  } else {
+  } catch {
     res.status(404).send("Data file not found. It may still be generating.");
   }
 });
-app.get("/debug-file", (req, res) => {
+
+// *** FIX APPLIED HERE: Converted route handler to async and replaced fs.existsSync ***
+app.get("/debug-file", async (req, res) => {
   const filePath = path.join(__dirname, 'debug_raw_spl_data.json');
-  if (fs.existsSync(filePath)) {
+  try {
+    await fs.access(filePath); // Check if the file exists and is accessible
     res.download(filePath);
-  } else {
+  } catch {
     res.status(404).send("Debug file not found. The downloadData script may not have completed successfully or created the file yet.");
   }
 });
@@ -444,7 +451,7 @@ app.get("/debug-file", (req, res) => {
 app.get('/api/get-table-data', async (req, res) => {
     const cacheFilePath = path.join(__dirname, 'public', 'drug_data_cache.json');
     try {
-        const data = await fs.promises.readFile(cacheFilePath, 'utf8');
+        const data = await fs.readFile(cacheFilePath, 'utf8');
         res.setHeader('Content-Type', 'application/json');
         res.send(data);
     } catch (error) {
