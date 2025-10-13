@@ -4,6 +4,23 @@ const downloadBtn = document.getElementById('downloadBtn');
 let allData = [];
 
 /**
+ * Formats a number as a US dollar currency string.
+ * @param {number | string} value The number to format.
+ * @returns {string} The formatted currency string (e.g., "$88.50") or "N/A".
+ */
+function formatCurrency(value) {
+  // Check if the value is a valid number
+  if (value === null || isNaN(Number(value))) {
+    return 'N/A';
+  }
+  // Use Intl.NumberFormat for proper currency formatting
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(value);
+}
+
+/**
  * Fetches the DTC pricing data from the server, sorts it, and renders the table.
  */
 async function fetchData() {
@@ -52,7 +69,7 @@ function renderTable(data) {
     // CORRECTED ALL KEYS to match dtc-data.json
     row.innerHTML = `
       <td>${item.drugName || 'N/A'}</td>
-      <td>${item.price || 'N/A'}</td>
+      <td>${formatCurrency(item.price)}</td>
       <td>${item.uom || 'N/A'}</td>
       <td>${item.form || 'N/A'}</td>
       <td>${item.strengths || 'N/A'}</td>
