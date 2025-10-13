@@ -144,7 +144,7 @@ function parseManufacturingInfo(labelData) {
  */
 async function loadDtcDataMap() {
     const dtcPriceMap = new Map();
-    const filePath = path.join(__dirname, 'dtc-data.json');
+    const filePath = path.join(__dirname, 'public', 'dtc-data.json');
     try {
         const fileContent = await fsPromises.readFile(filePath, 'utf8');
         const dtcData = JSON.parse(fileContent);
