@@ -136,15 +136,13 @@ function parseManufacturingInfo(labelData) {
 
 /**
  * ===================================================================================
- * ENGINE 5, PART 1: MFP CSV PARSER (FORENSIC LOGGING VERSION)
- * This version adds console.log statements to debug the matching issue.
+ * ENGINE 5, PART 1: MFP CSV PARSER (FINAL CORRECTED VERSION)
+ * Uses the correct column headers revealed by the forensic logs.
  * ===================================================================================
  */
 async function parseMfpCsvAndCreateMap() {
     const mfpPriceMap = new Map();
     const url = 'https://www.cms.gov/files/zip/file-negotiated-prices-also-known-maximum-fair-prices-statute.zip';
-    console.log(`Downloading MFP data from: ${url}`);
-    let headersLogged = false; // Flag to log headers only once
 
     return new Promise(async (resolve, reject) => {
         try {
@@ -157,41 +155,25 @@ async function parseMfpCsvAndCreateMap() {
             response.data
                 .pipe(unzipper.Parse())
                 .on('entry', function (entry) {
-                    const fileName = entry.path;
-                    if (fileName.endsWith('.csv')) {
-                        console.log(`Found CSV file in archive: ${fileName}`);
+                    if (entry.path.endsWith('.csv')) {
                         entry.pipe(csv())
-                            // --- FORENSIC LOG #1: Log the exact headers from the CSV file ---
-                            .on('headers', (headers) => {
-                                console.log('--- FORENSIC ANALYSIS: CSV Headers Found ---');
-                                console.log(headers);
-                                console.log('--------------------------------------------');
-                            })
                             .on('data', (row) => {
-                                const ndc = row['11-Digit National Drug Code (NDC)'];
-                                const priceStr = row['2026 Maximum Fair Price (MFP)'];
-                                const unit = row['MFP Unit'];
+                                // --- FIX: Using the correct column headers from the log ---
+                                const ndc = row['NDC-11'];
+                                const priceStr = row['NDC-9 MFP per Unit Price'];
 
-                                // --- FORENSIC LOG #2: Log the first 5 NDCs as they are processed ---
-                                if (mfpPriceMap.size < 5) {
-                                    console.log(`Raw NDC from CSV: '${ndc}'`);
-                                }
-
-                                if (ndc && priceStr && unit) {
+                                if (ndc && priceStr) {
                                     const normalizedNdc = ndc.replace(/-/g, '').trim();
                                     const price = parseFloat(priceStr.replace(/[$,]/g, ''));
                                     
-                                    if (mfpPriceMap.size < 5) {
-                                        console.log(`Normalized NDC for Map: '${normalizedNdc}'`);
-                                    }
-                                    
                                     if (!isNaN(price)) {
-                                        mfpPriceMap.set(normalizedNdc, { price, unit });
+                                        // The 'unit' column no longer exists, so we don't store it.
+                                        mfpPriceMap.set(normalizedNdc, { price });
                                     }
                                 }
                             })
                             .on('end', () => {
-                                console.log(`✅ CMS Maximum Fair Price CSV file successfully processed. Total NDCs in map: ${mfpPriceMap.size}`);
+                                console.log(`✅ CMS MFP CSV file processed. Total NDCs in map: ${mfpPriceMap.size}`);
                                 resolve(mfpPriceMap);
                             });
                     } else {
@@ -200,7 +182,7 @@ async function parseMfpCsvAndCreateMap() {
                 })
                 .on('error', (error) => reject(error));
         } catch (error) {
-            console.error('❌ Error downloading the MFP ZIP file:', error.message);
+            console.error('❌ Error in MFP data processing:', error.message);
             reject(error);
         }
     });
@@ -344,8 +326,8 @@ async function updateVaPriceCache() {
 
 /**
  * ===================================================================================
- * ENGINE 4, PART 2: MASTER DATA BUILDER (WITH NDC NORMALIZATION)
- * Normalizes NDCs before lookup for a reliable match.
+ * ENGINE 4, PART 2: MASTER DATA BUILDER (FINAL CORRECTED VERSION)
+ * Uses the correct data structure from the new MFP parser.
  * ===================================================================================
  */
 async function buildDrugDataCache() {
@@ -365,12 +347,12 @@ async function buildDrugDataCache() {
 
             let calculatedMfp = "N/A";
             if (drug.ndc11) {
-                // --- FIX: Normalize the NDC from drug_list.js before looking it up ---
                 const lookupNdc = drug.ndc11.replace(/-/g, '').trim();
 
                 if (mfpPriceMap.has(lookupNdc)) {
                     const mfpData = mfpPriceMap.get(lookupNdc);
-                    if (mfpData.unit.toLowerCase() === 'each' && !isNaN(parseInt(drug.quantity))) {
+                    // --- FIX: Removed the check for mfpData.unit, as that column no longer exists ---
+                    if (!isNaN(parseInt(drug.quantity))) {
                         calculatedMfp = mfpData.price * parseInt(drug.quantity);
                     }
                 }
