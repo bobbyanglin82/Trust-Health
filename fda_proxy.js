@@ -136,6 +136,35 @@ function parseManufacturingInfo(labelData) {
 
 /**
  * ===================================================================================
+ * ENGINE 6: DTC DATA LOADER
+ * Reads the manually curated dtc-data.json file.
+ * Returns a Map where the key is the drug name and the value is the price.
+ * ===================================================================================
+ */
+async function loadDtcDataMap() {
+    const dtcPriceMap = new Map();
+    const filePath = path.join(__dirname, 'dtc-data.json');
+    try {
+        const fileContent = await fs.promises.readFile(filePath, 'utf8');
+        const dtcData = JSON.parse(fileContent);
+        
+        for (const item of dtcData) {
+            if (item.drugName && item.price) {
+                const upperDrugName = item.drugName.trim().toUpperCase();
+                dtcPriceMap.set(upperDrugName, item.price);
+            }
+        }
+        console.log(`✅ DTC data file loaded. Found prices for ${dtcPriceMap.size} drugs.`);
+        return dtcPriceMap;
+    } catch (error) {
+        console.error('❌ Could not read or parse dtc-data.json:', error.message);
+        // Return an empty map if the file doesn't exist or has errors
+        return dtcPriceMap; 
+    }
+}
+
+/**
+ * ===================================================================================
  * ENGINE 5, PART 1: MFP CSV PARSER (FINAL CORRECTED VERSION)
  * Uses the correct column headers revealed by the forensic logs.
  * ===================================================================================
@@ -337,10 +366,12 @@ async function buildDrugDataCache() {
         if (!vaCacheResult.success) throw new Error("Failed to update VA price cache.");
         const vaPriceData = vaCacheResult.data;
 
+        // Load both MFP and DTC data maps
         const mfpPriceMap = await parseMfpCsvAndCreateMap();
+        const dtcPriceMap = await loadDtcDataMap(); // <-- ADD THIS
 
         const finalDrugData = [];
-        console.log("Enriching drug list with VA prices, FDA data, and MFP prices...");
+        console.log("Enriching drug list with all price points...");
         for (const drug of TOP_50_DRUGS) {
             const vaPrices = vaPriceData[drug.ndc11] || { fss_price: "N/A", big4_price: "N/A" };
             const expirationDate = await fetchExpirationDateForDrug(drug);
@@ -348,29 +379,33 @@ async function buildDrugDataCache() {
             let calculatedMfp = "N/A";
             if (drug.ndc11) {
                 const lookupNdc = drug.ndc11.replace(/-/g, '').trim();
-
                 if (mfpPriceMap.has(lookupNdc)) {
                     const mfpData = mfpPriceMap.get(lookupNdc);
-                    // --- FIX: Removed the check for mfpData.unit, as that column no longer exists ---
                     if (!isNaN(parseInt(drug.quantity))) {
                         calculatedMfp = mfpData.price * parseInt(drug.quantity);
                     }
                 }
             }
 
+            // --- ADD THIS BLOCK to look up the DTC price ---
+            const drugNameUpper = drug.drugName.toUpperCase();
+            const dtcPrice = dtcPriceMap.get(drugNameUpper) || "N/A";
+            // --- END BLOCK ---
+
             finalDrugData.push({
                 ...drug,
                 listing_expiration_date: expirationDate,
                 fss_price: vaPrices.fss_price,
                 big4_price: vaPrices.big4_price,
-                maximum_fair_price: calculatedMfp
+                maximum_fair_price: calculatedMfp,
+                dtc_price: dtcPrice // Add the new DTC data
             });
 
             await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         const finalCachePath = path.join(__dirname, 'public', 'drug_data_cache.json');
-        await fs.writeFile(finalCachePath, JSON.stringify(finalDrugData, null, 2));
+        await fs.promises.writeFile(finalCachePath, JSON.stringify(finalDrugData, null, 2));
         console.log(`Master drug data cache successfully written to ${finalCachePath}`);
 
         return { success: true, message: `Master cache written to ${finalCachePath}`, recordCount: finalDrugData.length };

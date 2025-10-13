@@ -3,8 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchData() {
         try {
-            // Updated colspan to 10
-            tbody.innerHTML = `<tr><td colspan="10">Loading FairRX data...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11">Loading FairRX data...</td></tr>`; // Colspan is now 11
             const response = await fetch(`/api/get-table-data?ts=${Date.now()}`);
             if (!response.ok) throw new Error('Network response was not ok');
             
@@ -12,16 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTable(allData);
         } catch (error) {
             console.error("Failed to fetch FairRX data:", error);
-            // Updated colspan to 10
-            tbody.innerHTML = `<tr><td colspan="10">Error: Could not load data. The data cache may need to be refreshed.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11">Error: Could not load data. The data cache may need to be refreshed.</td></tr>`; // Colspan is now 11
         }
     }
 
     function renderTable(data) {
         tbody.innerHTML = '';
         if (!data || data.length === 0) {
-            // Updated colspan to 10
-            tbody.innerHTML = `<tr><td colspan="10">No data found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11">No data found.</td></tr>`; // Colspan is now 11
             return;
         }
 
@@ -51,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${formatPrice(item.fss_price)}</td>
                 <td>${formatPrice(item.big4_price)}</td>
                 <td>${formatPrice(item.maximum_fair_price)}</td>
+                <td>${formatPrice(item.dtc_price)}</td>
                 <td>${item.listing_expiration_date || 'N/A'}</td>
             `;
             tbody.appendChild(row);
