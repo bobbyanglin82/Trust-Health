@@ -282,7 +282,6 @@ async function fetchExpirationDateForDrug(drug) {
 async function updateVaPriceCache() {
     console.log("Starting VA Price Cache Update from Excel file...");
     try {
-        // 1. DOWNLOAD THE VA's MASTER PRICING FILE (.xlsx)
         const vaFileURL = 'https://www.va.gov/opal/docs/nac/fss/vaFssPharmPrices.xlsx';
         console.log(`Downloading VA master Excel file from: ${vaFileURL}`);
         
@@ -292,7 +291,6 @@ async function updateVaPriceCache() {
             responseType: 'arraybuffer'
         });
 
-        // 2. PARSE THE EXCEL FILE AND AGGREGATE THE PRICE DATA
         console.log("Parsing and aggregating data from Excel file...");
         const workbook = xlsx.read(response.data, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
@@ -300,27 +298,17 @@ async function updateVaPriceCache() {
         const jsonData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
 
         const priceMap = {};
-        // Start loop at 1 to skip the header row
         for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i];
-            
-            // CORRECTED COLUMN POSITIONS based on your screenshot
-            const ndc11 = row[4];      // Column E is the 11-digit NDC
-            const price = row[12];     // Column M is the Price
-            const priceType = row[15]; // Column P is the Price Type ('FSS' or 'Big4')
+            const ndc11 = row[4];
+            const price = row[12];
+            const priceType = row[15];
 
             if (ndc11 && price && priceType) {
                 const ndcString = String(ndc11).trim();
-
-                // If we haven't seen this NDC before, initialize it.
                 if (!priceMap[ndcString]) {
-                    priceMap[ndcString] = {
-                        fss_price: "N/A",
-                        big4_price: "N/A"
-                    };
+                    priceMap[ndcString] = { fss_price: "N/A", big4_price: "N/A" };
                 }
-
-                // Populate the correct price based on the type.
                 if (String(priceType).trim().toLowerCase() === 'fss') {
                     priceMap[ndcString].fss_price = price;
                 } else if (String(priceType).trim().toLowerCase() === 'big4') {
@@ -330,7 +318,6 @@ async function updateVaPriceCache() {
         }
         console.log(`VA Excel file parsed. Found prices for ${Object.keys(priceMap).length} NDCs.`);
 
-        // 3. LOOK UP OUR 50 DRUGS AND CREATE THE FINAL CACHE OBJECT
         const vaPriceCache = {};
         for (const drug of TOP_50_DRUGS) {
             if (drug.ndc11 && priceMap[drug.ndc11]) {
@@ -340,9 +327,9 @@ async function updateVaPriceCache() {
             }
         }
 
-        // 4. SAVE THE CACHE TO A LOCAL FILE
         const cacheFilePath = './va_price_cache.json';
-        await fs.writeFile(cacheFilePath, JSON.stringify(vaPriceCache, null, 2));
+        // --- FIX IS HERE ---
+        await fsPromises.writeFile(cacheFilePath, JSON.stringify(vaPriceCache, null, 2));
         console.log(`VA price cache successfully written to ${cacheFilePath}`);
         
         return { success: true, message: `Cache written to ${cacheFilePath}`, data: vaPriceCache };
@@ -546,7 +533,8 @@ app.get("/debug-file", async (req, res) => {
 app.get('/api/get-table-data', async (req, res) => {
     const cacheFilePath = path.join(__dirname, 'public', 'drug_data_cache.json');
     try {
-        const data = await fs.readFile(cacheFilePath, 'utf8');
+        // --- FIX IS HERE ---
+        const data = await fsPromises.readFile(cacheFilePath, 'utf8');
         res.setHeader('Content-Type', 'application/json');
         res.send(data);
     } catch (error) {
