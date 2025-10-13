@@ -553,12 +553,17 @@ app.get('/api/refresh-data-cache', async (req, res) => {
 const PORT = process.env.PORT || 3001;
 
 // --- Server Startup & Export Logic ---
-async function startServer() {
+function startServer() {
   console.log('--- Server starting up ---');
-  await downloadData();
-  await buildDrugDataCache();
+
+  // Start the server immediately
   app.listen(PORT, () => {
-    console.log(`✅ Data is ready. Server is now live and listening on port ${PORT}`);
+    console.log(`✅ Server is live on port ${PORT}. Starting background data build...`);
+    
+    // Run the long data-building processes in the background AFTER the server is live.
+    // The 'await' keyword is removed so they don't block the startup.
+    downloadData();
+    buildDrugDataCache(); 
   });
 }
 
