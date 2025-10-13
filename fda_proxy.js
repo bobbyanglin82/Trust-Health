@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs').promises; // Using the promise-based version
+const fs = require('fs'); // For callback/stream-based operations
+const fsPromises = require('fs').promises; // For promise-based operations
 const axios = require('axios');
 const cron = require('node-cron');
 const xlsx = require('xlsx');
@@ -145,7 +146,7 @@ async function loadDtcDataMap() {
     const dtcPriceMap = new Map();
     const filePath = path.join(__dirname, 'dtc-data.json');
     try {
-        const fileContent = await fs.promises.readFile(filePath, 'utf8');
+        const fileContent = await fsPromises.readFile(filePath, 'utf8'); // <-- CHANGE HERE
         const dtcData = JSON.parse(fileContent);
         
         for (const item of dtcData) {
@@ -158,7 +159,6 @@ async function loadDtcDataMap() {
         return dtcPriceMap;
     } catch (error) {
         console.error('❌ Could not read or parse dtc-data.json:', error.message);
-        // Return an empty map if the file doesn't exist or has errors
         return dtcPriceMap; 
     }
 }
@@ -405,7 +405,7 @@ async function buildDrugDataCache() {
         }
 
         const finalCachePath = path.join(__dirname, 'public', 'drug_data_cache.json');
-        await fs.promises.writeFile(finalCachePath, JSON.stringify(finalDrugData, null, 2));
+        await fsPromises.writeFile(finalCachePath, JSON.stringify(finalDrugData, null, 2));
         console.log(`Master drug data cache successfully written to ${finalCachePath}`);
 
         return { success: true, message: `Master cache written to ${finalCachePath}`, recordCount: finalDrugData.length };
