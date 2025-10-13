@@ -136,9 +136,8 @@ function parseManufacturingInfo(labelData) {
 
 /**
  * ===================================================================================
- * ENGINE 5, PART 1: MFP CSV PARSER (FULLY AUTOMATED)
- * Downloads the CMS MFP zip file, finds the CSV inside, and parses it.
- * Returns a Map where the key is the 11-digit NDC and the value is the price/unit.
+ * ENGINE 5, PART 1: MFP CSV PARSER (WITH NDC NORMALIZATION)
+ * Normalizes NDCs to ensure a reliable match.
  * ===================================================================================
  */
 async function parseMfpCsvAndCreateMap() {
@@ -158,7 +157,6 @@ async function parseMfpCsvAndCreateMap() {
                 .pipe(unzipper.Parse())
                 .on('entry', function (entry) {
                     const fileName = entry.path;
-                    // We are looking for the CSV file inside the zip
                     if (fileName.endsWith('.csv')) {
                         console.log(`Found CSV file in archive: ${fileName}`);
                         entry.pipe(csv())
@@ -168,9 +166,12 @@ async function parseMfpCsvAndCreateMap() {
                                 const unit = row['MFP Unit'];
 
                                 if (ndc && priceStr && unit) {
+                                    // --- FIX: Normalize the NDC by removing all hyphens ---
+                                    const normalizedNdc = ndc.replace(/-/g, '').trim();
                                     const price = parseFloat(priceStr.replace(/[$,]/g, ''));
+                                    
                                     if (!isNaN(price)) {
-                                        mfpPriceMap.set(ndc.trim(), { price, unit });
+                                        mfpPriceMap.set(normalizedNdc, { price, unit });
                                     }
                                 }
                             })
@@ -179,15 +180,10 @@ async function parseMfpCsvAndCreateMap() {
                                 resolve(mfpPriceMap);
                             });
                     } else {
-                        // This will discard any other files in the zip (like PDFs, etc.)
                         entry.autodrain();
                     }
                 })
-                .on('error', (error) => {
-                    console.error('❌ Error processing ZIP file stream:', error);
-                    reject(error);
-                });
-
+                .on('error', (error) => reject(error));
         } catch (error) {
             console.error('❌ Error downloading the MFP ZIP file:', error.message);
             reject(error);
@@ -333,62 +329,54 @@ async function updateVaPriceCache() {
 
 /**
  * ===================================================================================
- * ENGINE 4, PART 2: MASTER DATA BUILDER (UPDATED)
- * Orchestrates the full data-gathering process. It now includes MFP data.
+ * ENGINE 4, PART 2: MASTER DATA BUILDER (WITH NDC NORMALIZATION)
+ * Normalizes NDCs before lookup for a reliable match.
  * ===================================================================================
  */
 async function buildDrugDataCache() {
     console.log("Starting master data cache build...");
     try {
-        // 1. First, ensure the VA price cache is up-to-date.
         const vaCacheResult = await updateVaPriceCache();
-        if (!vaCacheResult.success) {
-            throw new Error("Failed to update VA price cache. Aborting master build.");
-        }
+        if (!vaCacheResult.success) throw new Error("Failed to update VA price cache.");
         const vaPriceData = vaCacheResult.data;
 
-        // 2. NEW: Parse the MFP data file and create the price map.
         const mfpPriceMap = await parseMfpCsvAndCreateMap();
 
-        // 3. Loop through the master drug list and enrich each entry.
         const finalDrugData = [];
         console.log("Enriching drug list with VA prices, FDA data, and MFP prices...");
         for (const drug of TOP_50_DRUGS) {
-            // Get VA prices from our local cache
             const vaPrices = vaPriceData[drug.ndc11] || { fss_price: "N/A", big4_price: "N/A" };
-            
-            // Get expiration date from a live API call to OpenFDA
             const expirationDate = await fetchExpirationDateForDrug(drug);
 
-            // NEW: Look up MFP data and perform UOM calculation
             let calculatedMfp = "N/A";
-            if (drug.ndc11 && mfpPriceMap.has(drug.ndc11)) {
-                const mfpData = mfpPriceMap.get(drug.ndc11);
-                // Check if the unit is per item ('each') and quantity is a number
-                if (mfpData.unit.toLowerCase() === 'each' && !isNaN(parseInt(drug.quantity))) {
-                    calculatedMfp = mfpData.price * parseInt(drug.quantity);
+            if (drug.ndc11) {
+                // --- FIX: Normalize the NDC from drug_list.js before looking it up ---
+                const lookupNdc = drug.ndc11.replace(/-/g, '').trim();
+
+                if (mfpPriceMap.has(lookupNdc)) {
+                    const mfpData = mfpPriceMap.get(lookupNdc);
+                    if (mfpData.unit.toLowerCase() === 'each' && !isNaN(parseInt(drug.quantity))) {
+                        calculatedMfp = mfpData.price * parseInt(drug.quantity);
+                    }
                 }
             }
 
-            // Combine all data points into a single object
             finalDrugData.push({
                 ...drug,
                 listing_expiration_date: expirationDate,
                 fss_price: vaPrices.fss_price,
                 big4_price: vaPrices.big4_price,
-                maximum_fair_price: calculatedMfp // Add the new MFP data
+                maximum_fair_price: calculatedMfp
             });
 
             await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        // 4. Save the final, combined data to the master cache file.
         const finalCachePath = path.join(__dirname, 'public', 'drug_data_cache.json');
         await fs.writeFile(finalCachePath, JSON.stringify(finalDrugData, null, 2));
         console.log(`Master drug data cache successfully written to ${finalCachePath}`);
 
         return { success: true, message: `Master cache written to ${finalCachePath}`, recordCount: finalDrugData.length };
-
     } catch (error) {
         console.error("Error building master drug data cache:", error.message);
         return { success: false, message: error.message };
