@@ -19,8 +19,9 @@ async function fetchData() {
     
     // Sort data by the start date in descending order (newest first)
     allData.sort((a, b) => {
-      const dateA = a.price_start_date || '0';
-      const dateB = b.price_start_date || '0';
+      // CORRECTED KEY: priceStartDate
+      const dateA = a.priceStartDate || '0';
+      const dateB = b.priceStartDate || '0';
       return dateB.localeCompare(dateA); // Newest dates will come first
     });
     
@@ -48,15 +49,16 @@ function renderTable(data) {
     
     // Using innerHTML with a template literal for clean and readable cell creation.
     // The order matches the <thead> in dtc.html.
+    // CORRECTED ALL KEYS to match dtc-data.json
     row.innerHTML = `
-      <td>${item.drug_name || 'N/A'}</td>
-      <td>${item.cash_pay_price || 'N/A'}</td>
+      <td>${item.drugName || 'N/A'}</td>
+      <td>${item.price || 'N/A'}</td>
       <td>${item.uom || 'N/A'}</td>
       <td>${item.form || 'N/A'}</td>
       <td>${item.strengths || 'N/A'}</td>
-      <td>${item.manufacturer_program || 'N/A'}</td>
-      <td>${item.price_start_date || 'N/A'}</td>
-      <td><a href="${item.website_url || '#'}" target="_blank" rel="noopener noreferrer">${item.website_name || 'Link'}</a></td>
+      <td>${item.manufacturerProgram || 'N/A'}</td>
+      <td>${item.priceStartDate || 'N/A'}</td>
+      <td><a href="${item.websiteUrl || '#'}" target="_blank" rel="noopener noreferrer">${item.websiteName || 'Link'}</a></td>
     `;
     tbody.appendChild(row);
   });
@@ -70,8 +72,9 @@ if (searchBox) {
     
     const searchResults = allData.filter(item => {
       // Define the fields to search against
-      const drugName = (item.drug_name || '').toLowerCase();
-      const manufacturer = (item.manufacturer_program || '').toLowerCase();
+      // CORRECTED KEYS: drugName, manufacturerProgram
+      const drugName = (item.drugName || '').toLowerCase();
+      const manufacturer = (item.manufacturerProgram || '').toLowerCase();
       
       // Return true if the query is found in any of the fields
       return drugName.includes(query) || manufacturer.includes(query);
@@ -89,8 +92,9 @@ if (downloadBtn) {
     // If there is an active search, export only the filtered data
     if (query && allData) {
       dataToExport = allData.filter(item => {
-        const drugName = (item.drug_name || '').toLowerCase();
-        const manufacturer = (item.manufacturer_program || '').toLowerCase();
+        // CORRECTED KEYS: drugName, manufacturerProgram
+        const drugName = (item.drugName || '').toLowerCase();
+        const manufacturer = (item.manufacturerProgram || '').toLowerCase();
         return drugName.includes(query) || manufacturer.includes(query);
       });
     }
@@ -117,16 +121,17 @@ if (downloadBtn) {
 
     const csvRows = [headers.join(',')]; // Start with the header row
     dataToExport.forEach(item => {
+      // CORRECTED ALL KEYS to match dtc-data.json
       const row = [
-        item.drug_name,
-        item.cash_pay_price,
+        item.drugName,
+        item.price,
         item.uom,
         item.form,
         item.strengths,
-        item.manufacturer_program,
-        item.price_start_date,
-        item.website_name,
-        item.website_url
+        item.manufacturerProgram,
+        item.priceStartDate,
+        item.websiteName,
+        item.websiteUrl
       ].map(escapeCsvCell);
       csvRows.push(row.join(','));
     });
