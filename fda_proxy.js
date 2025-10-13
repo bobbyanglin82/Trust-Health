@@ -496,13 +496,13 @@ async function downloadData() {
       });
     }
 
-    await fs.writeFile(outputPath, JSON.stringify(enrichedResults, null, 2));
+    await fsPromises.writeFile(outputPath, JSON.stringify(enrichedResults, null, 2));
     console.log(`✅ File write to data.json complete.`);
 
   } catch (error) {
     console.error('❌ Error during data download:', error.message);
     // Create an empty file on error so the site doesn't break
-    await fs.writeFile(outputPath, '[]');
+    await fsPromises.writeFile(outputPath, '[]');
   }
 }
 
