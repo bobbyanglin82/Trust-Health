@@ -136,14 +136,15 @@ function parseManufacturingInfo(labelData) {
 
 /**
  * ===================================================================================
- * ENGINE 5, PART 1: MFP CSV PARSER (WITH NDC NORMALIZATION)
- * Normalizes NDCs to ensure a reliable match.
+ * ENGINE 5, PART 1: MFP CSV PARSER (FORENSIC LOGGING VERSION)
+ * This version adds console.log statements to debug the matching issue.
  * ===================================================================================
  */
 async function parseMfpCsvAndCreateMap() {
     const mfpPriceMap = new Map();
     const url = 'https://www.cms.gov/files/zip/file-negotiated-prices-also-known-maximum-fair-prices-statute.zip';
     console.log(`Downloading MFP data from: ${url}`);
+    let headersLogged = false; // Flag to log headers only once
 
     return new Promise(async (resolve, reject) => {
         try {
@@ -160,15 +161,29 @@ async function parseMfpCsvAndCreateMap() {
                     if (fileName.endsWith('.csv')) {
                         console.log(`Found CSV file in archive: ${fileName}`);
                         entry.pipe(csv())
+                            // --- FORENSIC LOG #1: Log the exact headers from the CSV file ---
+                            .on('headers', (headers) => {
+                                console.log('--- FORENSIC ANALYSIS: CSV Headers Found ---');
+                                console.log(headers);
+                                console.log('--------------------------------------------');
+                            })
                             .on('data', (row) => {
                                 const ndc = row['11-Digit National Drug Code (NDC)'];
                                 const priceStr = row['2026 Maximum Fair Price (MFP)'];
                                 const unit = row['MFP Unit'];
 
+                                // --- FORENSIC LOG #2: Log the first 5 NDCs as they are processed ---
+                                if (mfpPriceMap.size < 5) {
+                                    console.log(`Raw NDC from CSV: '${ndc}'`);
+                                }
+
                                 if (ndc && priceStr && unit) {
-                                    // --- FIX: Normalize the NDC by removing all hyphens ---
                                     const normalizedNdc = ndc.replace(/-/g, '').trim();
                                     const price = parseFloat(priceStr.replace(/[$,]/g, ''));
+                                    
+                                    if (mfpPriceMap.size < 5) {
+                                        console.log(`Normalized NDC for Map: '${normalizedNdc}'`);
+                                    }
                                     
                                     if (!isNaN(price)) {
                                         mfpPriceMap.set(normalizedNdc, { price, unit });
@@ -176,7 +191,7 @@ async function parseMfpCsvAndCreateMap() {
                                 }
                             })
                             .on('end', () => {
-                                console.log('✅ CMS Maximum Fair Price CSV file successfully processed.');
+                                console.log(`✅ CMS Maximum Fair Price CSV file successfully processed. Total NDCs in map: ${mfpPriceMap.size}`);
                                 resolve(mfpPriceMap);
                             });
                     } else {
