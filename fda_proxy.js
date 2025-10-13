@@ -146,13 +146,14 @@ async function loadDtcDataMap() {
     const dtcPriceMap = new Map();
     const filePath = path.join(__dirname, 'dtc-data.json');
     try {
-        const fileContent = await fsPromises.readFile(filePath, 'utf8'); // <-- CHANGE HERE
+        const fileContent = await fsPromises.readFile(filePath, 'utf8');
         const dtcData = JSON.parse(fileContent);
         
         for (const item of dtcData) {
             if (item.drugName && item.price) {
-                const upperDrugName = item.drugName.trim().toUpperCase();
-                dtcPriceMap.set(upperDrugName, item.price);
+                // --- FIX: Normalize name by removing special characters and making uppercase ---
+                const normalizedDrugName = item.drugName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                dtcPriceMap.set(normalizedDrugName, item.price);
             }
         }
         console.log(`✅ DTC data file loaded. Found prices for ${dtcPriceMap.size} drugs.`);
@@ -353,9 +354,8 @@ async function buildDrugDataCache() {
         if (!vaCacheResult.success) throw new Error("Failed to update VA price cache.");
         const vaPriceData = vaCacheResult.data;
 
-        // Load both MFP and DTC data maps
         const mfpPriceMap = await parseMfpCsvAndCreateMap();
-        const dtcPriceMap = await loadDtcDataMap(); // <-- ADD THIS
+        const dtcPriceMap = await loadDtcDataMap();
 
         const finalDrugData = [];
         console.log("Enriching drug list with all price points...");
@@ -374,10 +374,9 @@ async function buildDrugDataCache() {
                 }
             }
 
-            // --- ADD THIS BLOCK to look up the DTC price ---
-            const drugNameUpper = drug.drugName.toUpperCase();
-            const dtcPrice = dtcPriceMap.get(drugNameUpper) || "N/A";
-            // --- END BLOCK ---
+            // --- FIX: Normalize drug name before lookup to ensure a match ---
+            const normalizedDrugName = drug.drugName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            const dtcPrice = dtcPriceMap.get(normalizedDrugName) || "N/A";
 
             finalDrugData.push({
                 ...drug,
@@ -385,7 +384,7 @@ async function buildDrugDataCache() {
                 fss_price: vaPrices.fss_price,
                 big4_price: vaPrices.big4_price,
                 maximum_fair_price: calculatedMfp,
-                dtc_price: dtcPrice // Add the new DTC data
+                dtc_price: dtcPrice
             });
 
             await new Promise(resolve => setTimeout(resolve, 100));
