@@ -27,7 +27,7 @@ async function exportRawNdcQueryResults() {
     console.log(`Querying API: ${apiUrl}`);
     const response = await axios.get(apiUrl);
     // No change needed here, already using await
-    await fs.writeFile(outputPath, JSON.stringify(response.data, null, 2));
+    await fsPromises.writeFile(outputPath, JSON.stringify(response.data, null, 2));
     console.log(`✅ Success! The raw API response has been saved to: ${outputPath}`);
   } catch (error) {
     console.error('❌ Error during raw data export:', error.message);
@@ -505,7 +505,7 @@ app.get('/fair-rx.html', (req, res) => res.sendFile(path.join(__dirname, 'fair-r
 app.get("/data", async (req, res) => {
   const dataPath = path.join('/tmp', 'data.json');
   try {
-    await fs.access(dataPath); // Check if the file exists and is accessible
+    await fsPromises.access(dataPath); // Check if the file exists and is accessible
     res.sendFile(dataPath);
   } catch {
     res.status(404).send("Data file not found. It may still be generating.");
@@ -516,7 +516,7 @@ app.get("/data", async (req, res) => {
 app.get("/debug-file", async (req, res) => {
   const filePath = path.join(__dirname, 'debug_raw_spl_data.json');
   try {
-    await fs.access(filePath); // Check if the file exists and is accessible
+    await fsPromises.access(filePath); // Check if the file exists and is accessible
     res.download(filePath);
   } catch {
     res.status(404).send("Debug file not found. The downloadData script may not have completed successfully or created the file yet.");
